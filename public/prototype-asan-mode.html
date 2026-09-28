@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>اسکندر پارٹس — آسان ٹچ موڈ (Asaan Kiosk Mode)</title>
+
+  <!-- Google Fonts: Inter & Urdu Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Noto+Nastaliq+Urdu:wght@400;600;700&family=Noto+Sans+Arabic:wght@400;600;700;800;900&display=swap"
+    rel="stylesheet">
+
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success: #10b981;
+      --success-dark: #059669;
+      --warning: #f59e0b;
+      --warning-dark: #d97706;
+      --danger: #ef4444;
+      --danger-dark: #dc2626;
+      --slate-50: #f8fafc;
+      --slate-100: #f1f5f9;
+      --slate-200: #e2e8f0;
+      --slate-700: #334155;
+      --slate-900: #0f172a;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    body {
+      font-family: 'Noto Sans Arabic', 'Inter', system-ui, sans-serif;
+      background-color: #f8fafc;
+      background-image:
+        radial-gradient(at 100% 0%, rgba(224, 231, 255, 0.5) 0px, transparent 50%),
+        radial-gradient(at 0% 100%, rgba(241, 245, 249, 0.7) 0px, transparent 50%);
+      background-attachment: fixed;
+      color: var(--slate-900);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--slate-200);
+      height: 70px;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, #2563eb, #4f46e5);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    }
+
+    .brand-text h1 {
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      color: var(--slate-900);
+      line-height: 1.1;
+    }
+
+    .brand-text p {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--success);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 2px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      background-color: var(--success);
+      border-radius: 50%;
+      animation: pulse 1.8s infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+
+      50% {
+        transform: scale(1.3);
+        opacity: 0.7;
+      }
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Language Switcher */
+    .lang-switch {
+      direction: ltr;
+      display: inline-flex;
+      align-items: center;
+      background: var(--slate-200);
+      border-radius: 9999px;
+      padding: 3px;
+      cursor: pointer;
+      position: relative;
+      width: 110px;
+      height: 36px;
+      border: 1px solid #cbd5e1;
+    }
+
+    .lang-slider {
+      position: absolute;
+      top: 3px;
+      left: 54px;
+      width: 50px;
+      bottom: 3px;
+      background: var(--primary);
+      border-radius: 9999px;
+      transition: all 0.22s ease-out;
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
+    }
+
+    .lang-switch.roman .lang-slider {
+      left: 3px;
+      background: #ffffff;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .lang-btn {
+      flex: 1;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 800;
+      z-index: 2;
+      color: #64748b;
+      transition: color 0.2s;
+    }
+
+    .lang-btn.active {
+      color: #ffffff;
+    }
+
+    .lang-switch.roman .lang-btn.roman {
+      color: var(--primary);
+    }
+
+    .audio-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
+      padding: 6px 12px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      max-width: 1100px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 20px 16px 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Voice Bar (Bol Kar Search Karein) */
+    .voice-bar-wrapper {
+      background: #ffffff;
+      border-radius: 24px;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border: 2px solid #e2e8f0;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+      transition: all 0.2s;
+    }
+
+    .voice-bar-wrapper:focus-within,
+    .voice-bar-wrapper.listening {
+      border-color: var(--primary);
+      box-shadow: 0 10px 30px rgba(37, 99, 235, 0.15);
+    }
+
+    .voice-mic-btn {
+      width: 58px;
+      height: 58px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: #ffffff;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      cursor: pointer;
+      box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+
+    .voice-mic-btn:hover {
+      transform: scale(1.05);
+    }
+
+    .voice-mic-btn:active,
+    .voice-bar-wrapper.listening .voice-mic-btn {
+      animation: pulse-ring 1.2s infinite;
+      background: #ef4444;
+    }
+
+    @keyframes pulse-ring {
+      0% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+      }
+
+      70% {
+        box-shadow: 0 0 0 15px rgba(239, 68, 68, 0);
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+      }
+    }
+
+    .voice-text-info {
+      flex: 1;
+      text-align: right;
+    }
+
+    .voice-text-info h2 {
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--slate-900);
+      margin-bottom: 2px;
+    }
+
+    .voice-text-info p {
+      font-size: 13px;
+      color: #64748b;
+      font-weight: 600;
+    }
+
+    .voice-search-input {
+      background: transparent;
+      border: none;
+      outline: none;
+      width: 100%;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--slate-900);
+      display: none;
+    }
+
+    /* 4 Primary Action Tiles Grid */
+    .tiles-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 18px;
+    }
+
+    @media (max-width: 640px) {
+      .tiles-grid {
+        grid-template-columns: 1fr;
+        gap: 14px;
+      }
+    }
+
+    .action-tile {
+      background: #ffffff;
+      border-radius: 28px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+      border: 3px solid transparent;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      min-height: 220px;
+    }
+
+    .action-tile:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
+    }
+
+    .action-tile:active {
+      transform: scale(0.98);
+    }
+
+    /* Tile 1: Green (Naya Bill / Sale) */
+    .tile-sale {
+      background: linear-gradient(145deg, #ffffff 40%, #ecfdf5 100%);
+      border-color: #a7f3d0;
+    }
+
+    .tile-sale:hover {
+      border-color: var(--success);
+    }
+
+    .badge-sale {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    /* Tile 2: Orange (Workshop Service) */
+    .tile-workshop {
+      background: linear-gradient(145deg, #ffffff 40%, #fffbeb 100%);
+      border-color: #fde68a;
+    }
+
+    .tile-workshop:hover {
+      border-color: var(--warning);
+    }
+
+    .badge-workshop {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    /* Tile 3: Red (Udhaar Khata) */
+    .tile-khata {
+      background: linear-gradient(145deg, #ffffff 40%, #fef2f2 100%);
+      border-color: #fecaca;
+    }
+
+    .tile-khata:hover {
+      border-color: var(--danger);
+    }
+
+    .badge-khata {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    /* Tile 4: Blue (Parts & Rates) */
+    .tile-stock {
+      background: linear-gradient(145deg, #ffffff 40%, #eff6ff 100%);
+      border-color: #bfdbfe;
+    }
+
+    .tile-stock:hover {
+      border-color: var(--primary);
+    }
+
+    .badge-stock {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    .tile-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .tile-graphic {
+      width: 76px;
+      height: 76px;
+      border-radius: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 38px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+    }
+
+    .tile-sale .tile-graphic {
+      background: #10b981;
+      color: white;
+    }
+
+    .tile-workshop .tile-graphic {
+      background: #f59e0b;
+      color: white;
+    }
+
+    .tile-khata .tile-graphic {
+      background: #ef4444;
+      color: white;
+    }
+
+    .tile-stock .tile-graphic {
+      background: #2563eb;
+      color: white;
+    }
+
+    .tile-badge {
+      font-size: 13px;
+      font-weight: 800;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .tile-content {
+      margin-top: 18px;
+    }
+
+    .tile-title {
+      font-size: 24px;
+      font-weight: 900;
+      color: var(--slate-900);
+      line-height: 1.2;
+    }
+
+    .tile-desc {
+      font-size: 14px;
+      font-weight: 600;
+      color: #64748b;
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+
+    .tile-action-btn {
+      margin-top: 18px;
+      padding: 12px 18px;
+      border-radius: 16px;
+      font-size: 15px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: #ffffff;
+      border: none;
+      width: 100%;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      transition: opacity 0.2s;
+    }
+
+    .tile-sale .tile-action-btn {
+      background: #059669;
+    }
+
+    .tile-workshop .tile-action-btn {
+      background: #d97706;
+    }
+
+    .tile-khata .tile-action-btn {
+      background: #dc2626;
+    }
+
+    .tile-stock .tile-action-btn {
+      background: #2563eb;
+    }
+
+    /* Interactive Fast POS Sheet (Mockup Preview) */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(8px);
+      z-index: 50;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .fast-pos-card {
+      background: #ffffff;
+      border-radius: 32px;
+      max-width: 640px;
+      width: 100%;
+      padding: 24px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.25);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      max-height: 90vh;
+      overflow-y: auto;
+      border: 1px solid var(--slate-200);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid var(--slate-100);
+      padding-bottom: 14px;
+    }
+
+    .modal-header h3 {
+      font-size: 20px;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .modal-close {
+      background: #f1f5f9;
+      border: none;
+      width: 36px;
+      height: 36px;
+      border-radius: 12px;
+      font-size: 18px;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Visual Bike Selector (Big Buttons) */
+    .section-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: #64748b;
+      margin-bottom: 8px;
+    }
+
+    .bike-pills {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .bike-pill {
+      background: #f8fafc;
+      border: 2px solid var(--slate-200);
+      border-radius: 16px;
+      padding: 10px 4px;
+      text-align: center;
+      cursor: pointer;
+      font-weight: 800;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+
+    .bike-pill.active {
+      background: #eff6ff;
+      border-color: var(--primary);
+      color: var(--primary);
+      transform: scale(1.03);
+    }
+
+    /* Pictorial Fast Part Grid */
+    .part-items-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .part-item-btn {
+      background: #ffffff;
+      border: 2px solid var(--slate-200);
+      border-radius: 18px;
+      padding: 12px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .part-item-btn:hover {
+      border-color: var(--primary);
+      background: #f8fafc;
+    }
+
+    .part-item-btn:active {
+      transform: scale(0.95);
+    }
+
+    .part-item-btn .part-emoji {
+      font-size: 30px;
+    }
+
+    .part-item-btn .part-name {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--slate-900);
+      text-align: center;
+      line-height: 1.2;
+    }
+
+    .part-item-btn .part-price {
+      font-size: 12px;
+      font-weight: 900;
+      color: var(--success-dark);
+      background: #ecfdf5;
+      padding: 2px 8px;
+      border-radius: 9999px;
+    }
+
+    /* Live Cart Bar */
+    .live-cart-box {
+      background: #f8fafc;
+      border: 2px dashed #cbd5e1;
+      border-radius: 20px;
+      padding: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .cart-summary {
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .cart-total {
+      font-size: 24px;
+      font-weight: 900;
+      color: var(--primary);
+    }
+
+    .print-bill-btn {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      border: none;
+      padding: 18px;
+      border-radius: 20px;
+      font-size: 18px;
+      font-weight: 900;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35);
+      transition: all 0.2s;
+    }
+
+    .print-bill-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 30px rgba(16, 185, 129, 0.45);
+    }
+
+    /* Toast Notification for Audio Confirmation */
+    .audio-toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(100px);
+      background: #0f172a;
+      color: white;
+      padding: 14px 24px;
+      border-radius: 9999px;
+      font-size: 15px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      z-index: 100;
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .audio-toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    @media (max-width: 640px) {
+      header {
+        padding: 0 12px;
+        height: 60px;
+      }
+      .brand-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 18px;
+        border-radius: 10px;
+      }
+      .brand-text h1 {
+        font-size: 14px;
+      }
+      .audio-badge span:last-child {
+        display: none;
+      }
+      .audio-badge {
+        padding: 6px 8px;
+      }
+      .lang-switch {
+        width: 96px;
+        height: 32px;
+      }
+      .lang-slider {
+        width: 44px;
+        left: 47px;
+      }
+      .lang-switch.roman .lang-slider {
+        left: 3px;
+      }
+      .voice-bar-wrapper {
+        padding: 10px 14px;
+      }
+      .voice-mic-btn {
+        width: 48px;
+        height: 48px;
+        font-size: 20px;
+        border-radius: 14px;
+      }
+      .voice-text-info h2 {
+        font-size: 14px;
+      }
+      .voice-text-info p {
+        font-size: 11px;
+      }
+      .action-tile {
+        padding: 16px;
+        border-radius: 20px;
+        min-height: auto;
+      }
+      .tile-graphic {
+        width: 56px;
+        height: 56px;
+        font-size: 28px;
+        border-radius: 16px;
+      }
+      .tile-title {
+        font-size: 18px;
+      }
+      .tile-desc {
+        font-size: 12px;
+      }
+      .tile-action-btn {
+        padding: 10px 14px;
+        font-size: 13px;
+        border-radius: 12px;
+      }
+      .bike-pills {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .part-items-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .fast-pos-card {
+        padding: 16px;
+        border-radius: 20px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <!-- Brand -->
+    <div class="brand">
+      <div class="brand-icon">🏍️</div>
+      <div class="brand-text">
+        <h1 id="shop-title">اسکندر سپیئر پارٹس</h1>
+        <p>
+          <span class="status-dot"></span>
+          <span id="shop-mode-badge">⚡ آسان موڈ (Kiosk)</span>
+        </p>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="header-controls">
+      <!-- Voice Audio Feedback Toggle -->
+      <div class="audio-badge" onclick="toggleAudio()" id="audio-toggle-btn">
+        <span>🔊</span>
+        <span id="audio-status-text">آواز چالو ہے</span>
+      </div>
+
+      <!-- Language Toggle Switch -->
+      <div class="lang-switch" id="lang-switch" onclick="switchLanguage()">
+        <div class="lang-slider"></div>
+        <span class="lang-btn roman">Roman</span>
+        <span class="lang-btn urdu active">اردو</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main View Area -->
+  <main>
+    <!-- 1. Voice Search (Bol Kar Saman Dhoondein) -->
+    <div class="voice-bar-wrapper" id="voice-wrapper">
+      <button class="voice-mic-btn" onclick="startVoiceInput()" title="آواز سے تلاش کریں">
+        🎤
+      </button>
+      <div class="voice-text-info">
+        <h2 id="voice-heading">بول کر تلاش کریں (Voice Search)</h2>
+        <p id="voice-sub">مائیک کا بٹن دبائیں اور بولیں: "ہونڈا 70 کا آئل" یا "پلگ"</p>
+        <input type="text" class="voice-search-input" id="voice-input" placeholder="یہاں لکھا آئے گا..." />
+      </div>
+    </div>
+
+    <!-- 2. The 4 Giant Action Tiles -->
+    <div class="tiles-grid">
+      <!-- Tile 1: Naya Bill (Green) -->
+      <div class="action-tile tile-sale" onclick="openFastPOS()">
+        <div class="tile-top">
+          <div class="tile-graphic">💵</div>
+          <span class="tile-badge badge-sale" id="badge-sale-text">آج کی بکری: 10 بل</span>
+        </div>
+        <div class="tile-content">
+          <h2 class="tile-title" id="title-sale">نیا بل بنائیں (فروخت)</h2>
+          <p class="tile-desc" id="desc-sale">سامان بیچا، پرچی بنائی اور کیش وصول کیا۔</p>
+        </div>
+        <button class="tile-action-btn">
+          <span>👉</span>
+          <span id="btn-sale">ابھی بل بنائیں (Fast Bill)</span>
+        </button>
+      </div>
+
+      <!-- Tile 2: Workshop (Orange) -->
+      <div class="action-tile tile-workshop"
+        onclick="playAudio('ورکشاپ میں 4 گاڑیاں کام کے لیے موجود ہیں'); alert('ورکشاپ لائیو بے کھل گیا!');">
+        <div class="tile-top">
+          <div class="tile-graphic">🔧</div>
+          <span class="tile-badge badge-workshop" id="badge-workshop-text">4 گاڑیاں موجود ہیں</span>
+        </div>
+        <div class="tile-content">
+          <h2 class="tile-title" id="title-workshop">ورکشاپ سروس (گاڑی کا کام)</h2>
+          <p class="tile-desc" id="desc-workshop">میکینک کی مزدوری، ٹیوننگ اور گاڑی کی مرمت۔</p>
+        </div>
+        <button class="tile-action-btn">
+          <span>👉</span>
+          <span id="btn-workshop">ورکشاپ چیک کریں</span>
+        </button>
+      </div>
+
+      <!-- Tile 3: Udhaar Khata (Red) -->
+      <div class="action-tile tile-khata"
+        onclick="playAudio('ادھار کھاتے میں کل بیالیس ہزار پانچ سو روپے باقی ہیں'); alert('ادھار کھاتہ اور گاہکوں کا ریکارڈ کھل گیا!');">
+        <div class="tile-top">
+          <div class="tile-graphic">📕</div>
+          <span class="tile-badge badge-khata" id="badge-khata-text">باقی: 42,500 روپے</span>
+        </div>
+        <div class="tile-content">
+          <h2 class="tile-title" id="title-khata">ادھار کھاتہ (لال رجسٹر)</h2>
+          <p class="tile-desc" id="desc-khata">کس گاہک نے ادھار لیا اور کتنا باقی ہے۔</p>
+        </div>
+        <button class="tile-action-btn">
+          <span>👉</span>
+          <span id="btn-khata">کھاتہ دیکھیں اور لکھیں</span>
+        </button>
+      </div>
+
+      <!-- Tile 4: Stock & Rates (Blue) -->
+      <div class="action-tile tile-stock"
+        onclick="playAudio('دکان میں کل ایک سو بیس پارٹس موجود ہیں'); alert('سامان اور ریٹ لسٹ کھل گئی!');">
+        <div class="tile-top">
+          <div class="tile-graphic">📦</div>
+          <span class="tile-badge badge-stock" id="badge-stock-text">120 پارٹس موجود ہیں</span>
+        </div>
+        <div class="tile-content">
+          <h2 class="tile-title" id="title-stock">سامان کی قیمت اور ریٹ</h2>
+          <p class="tile-desc" id="desc-stock">ہر پارٹ کی قیمت چیک کریں اور اسٹاک دیکھیں۔</p>
+        </div>
+        <button class="tile-action-btn">
+          <span>👉</span>
+          <span id="btn-stock">ریٹ لسٹ چیک کریں</span>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Interactive 3-Touch Fast POS Modal -->
+  <div class="modal-overlay" id="pos-modal">
+    <div class="fast-pos-card">
+      <div class="modal-header">
+        <h3><span>⚡</span> <span id="pos-modal-title">فاسٹ ٹچ بل (Fast 1-Click Bill)</span></h3>
+        <button class="modal-close" onclick="closeFastPOS()">✕</button>
+      </div>
+
+      <!-- Step 1: Bike Selection -->
+      <div>
+        <div class="section-title" id="step1-title">مرحلہ 1: موٹرسائیکل ماڈل چنیں</div>
+        <div class="bike-pills">
+          <div class="bike-pill active" onclick="selectBike(this, 'Honda CD 70')">🏍️ CD 70</div>
+          <div class="bike-pill" onclick="selectBike(this, 'Honda CG 125')">🏍️ CG 125</div>
+          <div class="bike-pill" onclick="selectBike(this, 'Pridor 100')">🏍️ Pridor</div>
+          <div class="bike-pill" onclick="selectBike(this, 'GS 150 / Other')">🛵 GS 150</div>
+        </div>
+      </div>
+
+      <!-- Step 2: Visual Fast Items -->
+      <div>
+        <div class="section-title" id="step2-title">مرحلہ 2: سامان پر کلک کریں (Touch To Add)</div>
+        <div class="part-items-grid">
+          <div class="part-item-btn" onclick="addToCart('موبل آئل (Havoline)', 850)">
+            <span class="part-emoji">🛢️</span>
+            <span class="part-name">موبل آئل</span>
+            <span class="part-price">Rs 850</span>
+          </div>
+          <div class="part-item-btn" onclick="addToCart('اسپارک پلگ (NGK)', 350)">
+            <span class="part-emoji">⚡</span>
+            <span class="part-name">اسپارک پلگ</span>
+            <span class="part-price">Rs 350</span>
+          </div>
+          <div class="part-item-btn" onclick="addToCart('کلچ پلیٹ سیٹ', 950)">
+            <span class="part-emoji">⚙️</span>
+            <span class="part-name">کلچ پلیٹ</span>
+            <span class="part-price">Rs 950</span>
+          </div>
+          <div class="part-item-btn" onclick="addToCart('بریک شو (فرنٹ/ریئر)', 450)">
+            <span class="part-emoji">🛑</span>
+            <span class="part-name">بریک شو</span>
+            <span class="part-price">Rs 450</span>
+          </div>
+          <div class="part-item-btn" onclick="addToCart('چین گراری سیٹ', 1450)">
+            <span class="part-emoji">⛓️</span>
+            <span class="part-name">چین گراری</span>
+            <span class="part-price">Rs 1,450</span>
+          </div>
+          <div class="part-item-btn" onclick="addToCart('ٹیوننگ مزدوری', 300)">
+            <span class="part-emoji">🔧</span>
+            <span class="part-name">ٹیوننگ مزدوری</span>
+            <span class="part-price">Rs 300</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Total & Print -->
+      <div class="live-cart-box">
+        <div>
+          <div class="cart-summary" id="cart-item-count">کل سامان: 0 آئٹمز</div>
+          <div style="font-size: 11px; color: #64748b;" id="cart-bike-label">گاڑی: Honda CD 70</div>
+        </div>
+        <div class="cart-total" id="cart-total-display">Rs 0</div>
+      </div>
+
+      <button class="print-bill-btn" onclick="printBill()">
+        <span>🖨️</span>
+        <span id="print-btn-text">پرچی پرنٹ کریں اور کیش لیں</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Audio Toast -->
+  <div class="audio-toast" id="audio-toast">
+    <span>🔊</span>
+    <span id="toast-text">آواز تصدیق</span>
+  </div>
+
+  <script>
+    let currentLang = "ur";
+    let audioEnabled = true;
+    let cartTotal = 0;
+    let cartItemsCount = 0;
+    let selectedBikeName = "Honda CD 70";
+
+    // Text translations dictionary
+    const dict = {
+      ur: {
+        shopTitle: "اسکندر سپیئر پارٹس",
+        modeBadge: "⚡ آسان موڈ (Kiosk)",
+        audioOn: "آواز چالو ہے",
+        audioOff: "آواز بند ہے",
+        voiceHeading: "بول کر تلاش کریں (Voice Search)",
+        voiceSub: "مائیک کا بٹن دبائیں اور بولیں: 'ہونڈا 70 کا آئل' یا 'پلگ'",
+        badgeSale: "آج کی بکری: 10 بل",
+        titleSale: "نیا بل بنائیں (فروخت)",
+        descSale: "سامان بیچا، پرچی بنائی اور کیش وصول کیا۔",
+        btnSale: "ابھی بل بنائیں (Fast Bill)",
+        badgeWorkshop: "4 گاڑیاں موجود ہیں",
+        titleWorkshop: "ورکشاپ سروس (گاڑی کا کام)",
+        descWorkshop: "میکینک کی مزدوری، ٹیوننگ اور گاڑی کی مرمت۔",
+        btnWorkshop: "ورکشاپ چیک کریں",
+        badgeKhata: "باقی: 42,500 روپے",
+        titleKhata: "ادھار کھاتہ (لال رجسٹر)",
+        descKhata: "کس گاہک نے ادھار لیا اور کتنا باقی ہے۔",
+        btnKhata: "کھاتہ دیکھیں اور لکھیں",
+        badgeStock: "120 پارٹس موجود ہیں",
+        titleStock: "سامان کی قیمت اور ریٹ",
+        descStock: "ہر پارٹ کی قیمت چیک کریں اور اسٹاک دیکھیں۔",
+        btnStock: "ریٹ لسٹ چیک کریں",
+        posTitle: "فاسٹ ٹچ بل (Fast 1-Click Bill)",
+        step1: "مرحلہ 1: موٹرسائیکل ماڈل چنیں",
+        step2: "مرحلہ 2: سامان پر کلک کریں (Touch To Add)",
+        printBtn: "پرچی پرنٹ کریں اور کیش لیں",
+      },
+      roman: {
+        shopTitle: "Skander Spare Parts",
+        modeBadge: "⚡ Asaan Mode (Kiosk)",
+        audioOn: "Awaaz On Hai",
+        audioOff: "Awaaz Band Hai",
+        voiceHeading: "Bol Kar Search Karein (Voice)",
+        voiceSub: "Mic dabayein aur bolein: 'Honda 70 ka oil' ya 'plug'",
+        badgeSale: "Aaj Ki Sale: 10 Bills",
+        titleSale: "Naya Bill Banayein (Sale)",
+        descSale: "Saman becha, parchi banayi aur cash wasool kiya.",
+        btnSale: "Abhi Bill Banayein (Fast Bill)",
+        badgeWorkshop: "4 Gariyan Mojood Hain",
+        titleWorkshop: "Workshop Service (Kaam)",
+        descWorkshop: "Mechanic ki mazdoori, tuning aur gari ka kaam.",
+        btnWorkshop: "Workshop Check Karein",
+        badgeKhata: "Baqi: Rs 42,500",
+        titleKhata: "Udhaar Khata (Lal Register)",
+        descKhata: "Kis gahak ne udhaar liya aur kitna baqi hai.",
+        btnKhata: "Khata Dekhein & Likhein",
+        badgeStock: "120 Parts Mojood Hain",
+        titleStock: "Saman Ki Qeemat & Rates",
+        descStock: "Har part ka rate check karein aur stock dekhein.",
+        btnStock: "Rate List Check Karein",
+        posTitle: "Fast Touch Bill (1-Click)",
+        step1: "Marhala 1: Bike Model Chunein",
+        step2: "Marhala 2: Saman Par Click Karein",
+        printBtn: "Parchi Print Karein & Cash Lein",
+      }
+    };
+
+    function switchLanguage() {
+      const switchEl = document.getElementById("lang-switch");
+      if (currentLang === "ur") {
+        currentLang = "roman";
+        switchEl.classList.add("roman");
+        document.documentElement.setAttribute("dir", "ltr");
+        document.documentElement.setAttribute("lang", "en");
+      } else {
+        currentLang = "ur";
+        switchEl.classList.remove("roman");
+        document.documentElement.setAttribute("dir", "rtl");
+        document.documentElement.setAttribute("lang", "ur");
+      }
+      applyTranslations();
+      playAudio(currentLang === "ur" ? "اردو زبان لگ گئی ہے" : "Roman Urdu lag gayi hai");
+    }
+
+    function applyTranslations() {
+      const t = dict[currentLang];
+      document.getElementById("shop-title").textContent = t.shopTitle;
+      document.getElementById("shop-mode-badge").textContent = t.modeBadge;
+      document.getElementById("audio-status-text").textContent = audioEnabled ? t.audioOn : t.audioOff;
+      document.getElementById("voice-heading").textContent = t.voiceHeading;
+      document.getElementById("voice-sub").textContent = t.voiceSub;
+
+      document.getElementById("badge-sale-text").textContent = t.badgeSale;
+      document.getElementById("title-sale").textContent = t.titleSale;
+      document.getElementById("desc-sale").textContent = t.descSale;
+      document.getElementById("btn-sale").textContent = t.btnSale;
+
+      document.getElementById("badge-workshop-text").textContent = t.badgeWorkshop;
+      document.getElementById("title-workshop").textContent = t.titleWorkshop;
+      document.getElementById("desc-workshop").textContent = t.descWorkshop;
+      document.getElementById("btn-workshop").textContent = t.btnWorkshop;
+
+      document.getElementById("badge-khata-text").textContent = t.badgeKhata;
+      document.getElementById("title-khata").textContent = t.titleKhata;
+      document.getElementById("desc-khata").textContent = t.descKhata;
+      document.getElementById("btn-khata").textContent = t.btnKhata;
+
+      document.getElementById("badge-stock-text").textContent = t.badgeStock;
+      document.getElementById("title-stock").textContent = t.titleStock;
+      document.getElementById("desc-stock").textContent = t.descStock;
+      document.getElementById("btn-stock").textContent = t.btnStock;
+
+      document.getElementById("pos-modal-title").textContent = t.posTitle;
+      document.getElementById("step1-title").textContent = t.step1;
+      document.getElementById("step2-title").textContent = t.step2;
+      document.getElementById("print-btn-text").textContent = t.printBtn;
+    }
+
+    // Audio Voice Prompt (Speech Synthesis)
+    function playAudio(text) {
+      if (!audioEnabled) return;
+      showToast(text);
+      try {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.rate = 1.0;
+          utterance.lang = currentLang === 'ur' ? 'ur-PK' : 'en-US';
+          window.speechSynthesis.speak(utterance);
+        }
+      } catch (e) { }
+    }
+
+    function toggleAudio() {
+      audioEnabled = !audioEnabled;
+      const text = document.getElementById("audio-status-text");
+      text.textContent = audioEnabled ? (currentLang === 'ur' ? "آواز چالو ہے" : "Awaaz On Hai") : (currentLang === 'ur' ? "آواز بند ہے" : "Awaaz Band Hai");
+      playAudio(audioEnabled ? "آواز آن ہو گئی ہے" : "آواز بند ہو گئی");
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById("audio-toast");
+      const text = document.getElementById("toast-text");
+      text.textContent = msg;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 2600);
+    }
+
+    // Voice Input Simulation
+    function startVoiceInput() {
+      const wrapper = document.getElementById("voice-wrapper");
+      wrapper.classList.add("listening");
+      playAudio(currentLang === 'ur' ? "اب بولیں، میں سن رہا ہوں" : "Ab bolein, sun raha hun");
+
+      setTimeout(() => {
+        wrapper.classList.remove("listening");
+        const phrase = currentLang === 'ur' ? "ہونڈا 70 کا موبل آئل" : "Honda 70 Havoline Oil";
+        playAudio(phrase + " مل گیا!");
+        openFastPOS();
+        addToCart(phrase, 850);
+      }, 2000);
+    }
+
+    // Fast POS Flow
+    function openFastPOS() {
+      cartTotal = 0;
+      cartItemsCount = 0;
+      updateCartDisplay();
+      document.getElementById("pos-modal").classList.add("active");
+      playAudio(currentLang === 'ur' ? "نیا بل بنانے کے لیے سامان منتخب کریں" : "Naya bill ke liye saman chunein");
+    }
+
+    function closeFastPOS() {
+      document.getElementById("pos-modal").classList.remove("active");
+    }
+
+    function selectBike(el, name) {
+      document.querySelectorAll(".bike-pill").forEach(p => p.classList.remove("active"));
+      el.classList.add("active");
+      selectedBikeName = name;
+      document.getElementById("cart-bike-label").textContent = (currentLang === 'ur' ? "گاڑی: " : "Gari: ") + name;
+      playAudio(name + " چن لیا گیا");
+    }
+
+    function addToCart(itemName, price) {
+      cartTotal += price;
+      cartItemsCount += 1;
+      updateCartDisplay();
+      playAudio(itemName + ", " + price + " روپے شامل ہو گئے");
+    }
+
+    function updateCartDisplay() {
+      document.getElementById("cart-total-display").textContent = "Rs " + cartTotal.toLocaleString();
+      document.getElementById("cart-item-count").textContent = (currentLang === 'ur' ? "کل سامان: " : "Kul Saman: ") + cartItemsCount + (currentLang === 'ur' ? " آئٹمز" : " Items");
+    }
+
+    function printBill() {
+      if (cartTotal === 0) {
+        playAudio(currentLang === 'ur' ? "پہلے کوئی سامان تو چن لیں!" : "Pehle koi saman to shamil karein!");
+        return;
+      }
+      playAudio(currentLang === 'ur' ? cartTotal + " روپے کا بل بن گیا اور پرچی پرنٹ ہو رہی ہے!" : cartTotal + " rupay ka bill print ho gaya!");
+      alert(`✅ کامیابی!\n\nگاڑی: ${selectedBikeName}\nکل رقم: Rs ${cartTotal.toLocaleString()}\n\nپرچی کامیابی سے پرنٹ ہو گئی۔`);
+      closeFastPOS();
+    }
+  </script>
+</body>
+
+</html>

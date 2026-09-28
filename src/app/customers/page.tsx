@@ -17,6 +17,7 @@ import {
   TrendingUp,
   X,
   Printer,
+  MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -168,16 +169,30 @@ export default function CustomersPage() {
                     {customer.name}
                   </h3>
                   {customer.phone ? (
-                    <a
-                      href={`tel:${customer.phone}`}
-                      className="text-xs text-blue-700 font-bold font-mono mt-0.5 flex items-center gap-1.5 hover:underline"
-                    >
-                      <span className="p-1 rounded-full bg-emerald-100 text-emerald-700">
-                        <Phone className="h-3 w-3" />
-                      </span>
-                      <span>{customer.phone}</span>
-                      <span className="text-[10px] font-normal text-slate-400">(Call)</span>
-                    </a>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <a
+                        href={`tel:${customer.phone}`}
+                        className="text-xs text-blue-700 font-bold font-mono flex items-center gap-1.5 hover:underline"
+                      >
+                        <span className="p-1 rounded-full bg-blue-100 text-blue-700">
+                          <Phone className="h-3 w-3" />
+                        </span>
+                        <span>{customer.phone}</span>
+                      </a>
+                      <a
+                        href={`https://wa.me/${
+                          customer.phone.replace(/[^0-9]/g, "").startsWith("0")
+                            ? "92" + customer.phone.replace(/[^0-9]/g, "").slice(1)
+                            : customer.phone.replace(/[^0-9]/g, "")
+                        }`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1 rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition active:scale-95"
+                        title="WhatsApp par rabta karein"
+                      >
+                        <MessageCircle className="h-3 w-3" />
+                      </a>
+                    </div>
                   ) : (
                     <div className="text-xs text-slate-400 font-mono mt-0.5">
                       No phone

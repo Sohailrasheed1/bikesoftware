@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Bill } from "@/types";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { Printer, FileText, CheckCircle2 } from "lucide-react";
+import { Printer, FileText, CheckCircle2, MessageCircle } from "lucide-react";
 import { formatPKR, formatDateTime } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
 
@@ -23,6 +23,44 @@ export function ReceiptModal({ bill, isOpen, onClose }: ReceiptModalProps) {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleWhatsAppShare = () => {
+    let phone = bill.customerPhone ? bill.customerPhone.replace(/[^0-9]/g, "") : "";
+    if (phone.startsWith("0")) {
+      phone = "92" + phone.slice(1);
+    } else if (!phone.startsWith("92") && phone.length === 10) {
+      phone = "92" + phone;
+    }
+
+    const itemsSummary = bill.items
+      .map((it) => `• ${it.partName} x${it.quantity} = Rs. ${it.totalPrice}`)
+      .join("\n");
+    const labourSummary =
+      bill.labourItems && bill.labourItems.length > 0
+        ? "\n*Labour/Ujrat:*\n" +
+          bill.labourItems.map((l) => `• ${l.description} = Rs. ${l.amount}`).join("\n")
+        : "";
+
+    const text =
+      `*${t.appName} — Receipt #${bill.billNumber}*\n` +
+      `Date: ${formatDateTime(bill.createdAt)}\n` +
+      `Customer: ${bill.customerName || "Walk-in Customer"}\n` +
+      (bill.bikeModel ? `Bike: ${bill.bikeModel} (${bill.bikeRegNumber || ""})\n` : "") +
+      `------------------------\n` +
+      `*Saman (Parts):*\n${itemsSummary}` +
+      `${labourSummary}\n` +
+      `------------------------\n` +
+      (bill.discount > 0 ? `Discount: -Rs. ${bill.discount}\n` : "") +
+      `*Grand Total: Rs. ${bill.grandTotal}*\n` +
+      `Payment: ${bill.paymentMethod} (Paid: Rs. ${bill.paidAmount})\n\n` +
+      `Thank you for visiting Skander Spare Parts, Karachi!\n` +
+      `Ph: 0300-1234567`;
+
+    const url = phone
+      ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
+      : `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+    window.open(url, "_blank");
   };
 
   return (
@@ -305,14 +343,31 @@ export function ReceiptModal({ bill, isOpen, onClose }: ReceiptModalProps) {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200/80 no-print">
-          <Button variant="secondary" onClick={onClose}>
+        <div className="flex flex-wrap items-center justify-between gap-2.5 pt-3 border-t border-slate-200/80 no-print">
+          <Button variant="secondary" onClick={onClose} className="text-xs">
             {t.cancel}
           </Button>
-          <Button variant="primary" onClick={handlePrint} className="gap-2 font-bold shadow-md">
-            <Printer className="h-4 w-4" />
-            {t.print}
-          </Button>
+
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleWhatsAppShare}
+              className="gap-1.5 font-bold text-xs border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 active:scale-95 transition"
+            >
+              <MessageCircle className="h-4 w-4 text-emerald-600" />
+              <span>{isUrdu ? "واٹس ایپ رسید" : "WhatsApp"}</span>
+            </Button>
+
+            <Button
+              variant="primary"
+              onClick={handlePrint}
+              className="gap-2 font-bold shadow-md text-xs active:scale-95 transition"
+            >
+              <Printer className="h-4 w-4" />
+              {t.print}
+            </Button>
+          </div>
         </div>
       </div>
     </Modal>

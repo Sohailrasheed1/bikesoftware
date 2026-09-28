@@ -199,7 +199,7 @@ export default function InventoryPage() {
           className="bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-md shadow-blue-600/20 text-xs sm:text-sm h-11"
         >
           <Plus className="h-4 w-4 mr-1.5" />
-          + {t.addNewPart}
+          {t.addNewPart}
         </Button>
       </div>
 
