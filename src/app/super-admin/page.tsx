@@ -389,6 +389,10 @@ export default function SuperAdminPage() {
 
           <button
             onClick={async () => {
+              if (typeof window !== "undefined") {
+                localStorage.removeItem("gilani_autos_offline_session");
+                localStorage.removeItem("gilani_autos_logged_in");
+              }
               await signOut({ redirect: false });
               window.location.href = "/login";
             }}

@@ -173,8 +173,12 @@ export function Navbar() {
 
           {/* Logout Button */}
           <button
-            onClick={() => {
-              window.location.href = "/api/auth/logout";
+            onClick={async () => {
+              if (typeof window !== "undefined") {
+                localStorage.removeItem("gilani_autos_offline_session");
+                localStorage.removeItem("gilani_autos_logged_in");
+              }
+              await signOut({ callbackUrl: "/login" });
             }}
             title={t.logout}
             className="p-1.5 sm:p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 active:scale-95 rounded-xl transition flex-shrink-0 cursor-pointer"

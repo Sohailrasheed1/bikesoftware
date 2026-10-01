@@ -37,6 +37,8 @@ export const metadata: Metadata = {
   },
 };
 
+import { ServiceWorkerRegister } from "@/components/providers/service-worker-register";
+
 export default function RootLayout({
   children,
 }: {
@@ -45,6 +47,7 @@ export default function RootLayout({
   return (
     <html lang="ur-Latn">
       <body className="antialiased font-sans text-slate-900 bg-slate-50 selection:bg-blue-100 selection:text-blue-900">
+        <ServiceWorkerRegister />
         <AuthProvider>
           <LanguageProvider>
             <ToastProvider>

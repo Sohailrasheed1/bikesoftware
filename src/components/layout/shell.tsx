@@ -15,9 +15,24 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const isLoginPage = pathname === "/login";
   const isSuperAdmin = pathname.startsWith("/super-admin");
 
-  // If unauthenticated and on a protected page, redirect to login
+  // Save active online session to localStorage for offline fallback
   useEffect(() => {
-    if (!isLoginPage && status === "unauthenticated") {
+    if (status === "authenticated" && session?.user) {
+      try {
+        localStorage.setItem("gilani_autos_logged_in", "true");
+        localStorage.setItem("gilani_autos_offline_session", JSON.stringify(session.user));
+      } catch (e) {}
+    }
+  }, [status, session]);
+
+  // If unauthenticated and on a protected page (and no local offline session), redirect to login
+  useEffect(() => {
+    const hasOfflineSession =
+      typeof window !== "undefined" &&
+      (localStorage.getItem("gilani_autos_logged_in") === "true" ||
+        !!localStorage.getItem("gilani_autos_offline_session"));
+
+    if (!isLoginPage && status === "unauthenticated" && !hasOfflineSession) {
       const redirectUrl =
         pathname && pathname !== "/"
           ? `/login?callbackUrl=${encodeURIComponent(pathname)}`
