@@ -108,7 +108,7 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
         </div>
         <div>
           <h1 className="font-extrabold text-base tracking-tight text-slate-900 leading-tight">
-            {t.appName}
+            {(session?.user as any)?.shopName || t.appName}
           </h1>
           <p className="text-[11px] font-semibold text-blue-600 tracking-wide">
             {t.appSubtitle}
@@ -203,7 +203,7 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
             </div>
             <div>
               <div className="text-xs font-bold text-slate-800 leading-tight">
-                {session?.user?.name || "Skander (Admin)"}
+                {session?.user?.name || "Gilani Autos (Admin)"}
               </div>
               <div className="text-[11px] text-slate-500 font-medium">
                 {(session?.user as any)?.role === "staff"
@@ -217,12 +217,11 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
             </div>
           </div>
           <button
-            onClick={async () => {
-              await signOut({ redirect: false });
-              window.location.href = "/login";
+            onClick={() => {
+              window.location.href = "/api/auth/logout";
             }}
             title={t.logout}
-            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
           >
             <LogOut className="h-4 w-4" />
           </button>

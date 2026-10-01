@@ -3,6 +3,7 @@ import "./globals.css";
 import { StoreProvider } from "@/lib/storage/context";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { LanguageProvider } from "@/lib/i18n/context";
+import { ToastProvider } from "@/components/providers/toast-provider";
 import { Shell } from "@/components/layout/shell";
 
 export const viewport: Viewport = {
@@ -15,14 +16,17 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Skander Spare Parts — Complete Shop Management System",
+  title: "Gilani Autos — Complete Shop Management System",
   description:
-    "Professional motorcycle spare parts shop management software for Skander Spare Parts, Karachi. Bilingual: Roman Urdu & Proper Urdu with Inventory, Workshop, POS Billing, Customers, and Reports.",
+    "Professional motorcycle spare parts shop management software for Gilani Autos, Karachi. Bilingual: Roman Urdu & Proper Urdu with Inventory, Workshop, POS Billing, Customers, and Reports.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Skander Parts",
+    title: "Gilani Autos",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
   },
   formatDetection: {
     telephone: false,
@@ -43,9 +47,11 @@ export default function RootLayout({
       <body className="antialiased font-sans text-slate-900 bg-slate-50 selection:bg-blue-100 selection:text-blue-900">
         <AuthProvider>
           <LanguageProvider>
-            <StoreProvider>
-              <Shell>{children}</Shell>
-            </StoreProvider>
+            <ToastProvider>
+              <StoreProvider>
+                <Shell>{children}</Shell>
+              </StoreProvider>
+            </ToastProvider>
           </LanguageProvider>
         </AuthProvider>
       </body>

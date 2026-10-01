@@ -27,7 +27,7 @@ import { Bill } from "@/types";
 import { formatPKR, formatDate, formatDateTime } from "@/lib/utils";
 
 export default function BillHistoryPage() {
-  const { bills, cancelBill } = useStore();
+  const { bills, cancelBill, deleteBill } = useStore();
   const { t, isUrdu } = useLanguage();
 
   const [search, setSearch] = useState("");
@@ -47,6 +47,16 @@ export default function BillHistoryPage() {
       setTimeout(() => setCancelSuccessMsg(""), 5000);
     } catch (err: any) {
       alert(err.message || "Bill cancel karne mein masla aaya.");
+    }
+  };
+
+  const handleDeleteBill = async (bill: Bill) => {
+    if (confirm(`Kya aap waqai Bill #${bill.billNumber} (${bill.customerName}) ko delete karna chahte hain?`)) {
+      try {
+        await deleteBill(bill.id);
+      } catch (err: any) {
+        alert(err.message || "Bill delete karne mein masla aaya.");
+      }
     }
   };
 
@@ -219,15 +229,25 @@ export default function BillHistoryPage() {
                     <span>Parchi Print</span>
                   </Button>
 
-                  {!isCancelled && (
+                  <div className="flex items-center gap-1.5">
+                    {!isCancelled && (
+                      <button
+                        type="button"
+                        onClick={() => setBillToCancel(bill)}
+                        className="text-xs font-semibold text-rose-600 hover:text-rose-700 px-2 py-1 rounded-lg hover:bg-rose-50 transition"
+                      >
+                        Cancel
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={() => setBillToCancel(bill)}
-                      className="text-xs font-semibold text-rose-600 hover:text-rose-700 px-2.5 py-1 rounded-lg hover:bg-rose-50 transition"
+                      onClick={() => handleDeleteBill(bill)}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition"
+                      title="Bill Delete Karein"
                     >
-                      Bill Cancel Karein
+                      <Trash2 className="h-4 w-4" />
                     </button>
-                  )}
+                  </div>
                 </div>
               </div>
             );
@@ -332,12 +352,21 @@ export default function BillHistoryPage() {
                             <button
                               type="button"
                               onClick={() => setBillToCancel(bill)}
-                              className="p-1 text-slate-400 hover:text-rose-600 transition"
+                              className="p-1 text-slate-400 hover:text-amber-600 transition"
                               title="Bill Mansookh Karein (Stock wapas shamil hoga)"
                             >
                               <RotateCcw className="h-4 w-4" />
                             </button>
                           )}
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteBill(bill)}
+                            className="p-1 text-slate-300 hover:text-rose-600 transition"
+                            title="Bill Record Delete Karein"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>

@@ -17,6 +17,7 @@ import {
   ArrowRight,
   Receipt,
   User,
+  Edit,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,7 @@ export default function SupplierCreditPage() {
   const {
     supplierCredits,
     addSupplierCredit,
+    updateSupplierCredit,
     recordSupplierPayment,
     deleteSupplierCredit,
   } = useStore();
@@ -59,6 +61,43 @@ export default function SupplierCreditPage() {
 
   // Payment History View Modal
   const [viewHistoryCredit, setViewHistoryCredit] = useState<SupplierCredit | null>(null);
+
+  // Edit Credit Modal
+  const [editingCredit, setEditingCredit] = useState<SupplierCredit | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    supplierName: "",
+    supplierPhone: "",
+    purchasedParts: "",
+    quantity: 1,
+    totalAmount: 0,
+    dueDate: "",
+  });
+
+  const handleOpenEdit = (credit: SupplierCredit) => {
+    setEditingCredit(credit);
+    setEditFormData({
+      supplierName: credit.supplierName,
+      supplierPhone: credit.supplierPhone,
+      purchasedParts: credit.purchasedParts,
+      quantity: credit.quantity,
+      totalAmount: credit.totalAmount,
+      dueDate: credit.dueDate ? credit.dueDate.split("T")[0] : "",
+    });
+  };
+
+  const handleUpdateCredit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCredit) return;
+    await updateSupplierCredit(editingCredit.id, {
+      supplierName: editFormData.supplierName,
+      supplierPhone: editFormData.supplierPhone,
+      purchasedParts: editFormData.purchasedParts,
+      quantity: Number(editFormData.quantity) || 1,
+      totalAmount: Number(editFormData.totalAmount) || 0,
+      dueDate: editFormData.dueDate ? new Date(editFormData.dueDate).toISOString() : editingCredit.dueDate,
+    });
+    setEditingCredit(null);
+  };
 
   // Calculations
   const totalOutstanding = supplierCredits.reduce((acc, c) => acc + c.remainingBalance, 0);
@@ -348,8 +387,17 @@ export default function SupplierCreditPage() {
                     )}
                     <button
                       type="button"
+                      onClick={() => handleOpenEdit(credit)}
+                      className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-indigo-50 transition"
+                      title="Edit Karein"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => handleDelete(credit.id, credit.supplierName)}
-                      className="p-1.5 text-slate-400 hover:text-rose-600"
+                      className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition"
+                      title="Delete Karein"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -458,6 +506,15 @@ export default function SupplierCreditPage() {
                               Payment Karein
                             </Button>
                           )}
+
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(credit)}
+                            className="p-1 text-slate-300 hover:text-indigo-600 transition"
+                            title="Edit"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
 
                           <button
                             onClick={() => handleDelete(credit.id, credit.supplierName)}
@@ -652,6 +709,79 @@ export default function SupplierCreditPage() {
             )}
           </div>
         </div>
+      </Modal>
+
+      {/* Edit Supplier Credit Modal */}
+      <Modal
+        isOpen={!!editingCredit}
+        onClose={() => setEditingCredit(null)}
+        title="Supplier Udhaar Update Karein"
+        description="Supplier aur maal ki details tabdeel karein"
+        maxWidth="md"
+      >
+        <form onSubmit={handleUpdateCredit} className="space-y-4">
+          <Input
+            label="Supplier Ka Naam *"
+            required
+            value={editFormData.supplierName}
+            onChange={(e) => setEditFormData({ ...editFormData, supplierName: e.target.value })}
+          />
+
+          <Input
+            label="Phone Number"
+            value={editFormData.supplierPhone}
+            onChange={(e) => setEditFormData({ ...editFormData, supplierPhone: e.target.value })}
+            className="font-mono text-xs"
+          />
+
+          <Input
+            label="Kharide Gaye Saman Ki Tafseel *"
+            required
+            value={editFormData.purchasedParts}
+            onChange={(e) => setEditFormData({ ...editFormData, purchasedParts: e.target.value })}
+          />
+
+          <div className="grid grid-cols-2 gap-3.5">
+            <Input
+              label="Tadad (Quantity) *"
+              type="number"
+              min="1"
+              required
+              value={editFormData.quantity}
+              onChange={(e) => setEditFormData({ ...editFormData, quantity: Number(e.target.value) })}
+            />
+
+            <Input
+              label="Kul Udhaar Raqam (Rs.) *"
+              type="number"
+              min="0"
+              required
+              value={editFormData.totalAmount}
+              onChange={(e) => setEditFormData({ ...editFormData, totalAmount: Number(e.target.value) })}
+            />
+          </div>
+
+          <Input
+            label="Payment Wapsi Ki Tareekh (Due Date) *"
+            type="date"
+            required
+            value={editFormData.dueDate}
+            onChange={(e) => setEditFormData({ ...editFormData, dueDate: e.target.value })}
+          />
+
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setEditingCredit(null)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" className="font-bold">
+              Tabdeeli Mahfooz Karein
+            </Button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

@@ -22,6 +22,7 @@ import {
   Check,
   X,
   Percent,
+  Edit,
 } from "lucide-react";
 import { useStore } from "@/lib/storage/context";
 import { VehicleJobCard, Part, Bill, BillLabourItem, BillItem } from "@/types";
@@ -94,6 +95,64 @@ export default function WorkshopBayPage() {
   const [checkoutNotes, setCheckoutNotes] = useState("");
   const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
+
+  // Edit Job Modal state
+  const [editingJob, setEditingJob] = useState<VehicleJobCard | null>(null);
+  const [editBayNumber, setEditBayNumber] = useState<number>(1);
+  const [editCustomerName, setEditCustomerName] = useState("");
+  const [editCustomerPhone, setEditCustomerPhone] = useState("");
+  const [editBikeModel, setEditBikeModel] = useState("Honda CD 70");
+  const [editBikeRegNumber, setEditBikeRegNumber] = useState("");
+  const [editComplaint, setEditComplaint] = useState("");
+  const [editMechanicId, setEditMechanicId] = useState("");
+  const [editJobError, setEditJobError] = useState("");
+
+  const handleOpenEditJob = (job: VehicleJobCard) => {
+    setEditingJob(job);
+    setEditBayNumber(job.bayNumber);
+    setEditCustomerName(job.customerName);
+    setEditCustomerPhone(job.customerPhone || "");
+    setEditBikeModel(job.bikeModel);
+    setEditBikeRegNumber(job.bikeRegNumber);
+    setEditComplaint(job.complaintDescription || "");
+    setEditMechanicId(job.assignedMechanicId || "");
+    setEditJobError("");
+  };
+
+  const handleUpdateJobSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingJob) return;
+    if (!editCustomerName.trim() || !editBikeRegNumber.trim()) {
+      setEditJobError("Gahak ka naam aur bike number zaroori hain.");
+      return;
+    }
+    const mech = mechanics.find((m) => m.id === editMechanicId);
+    try {
+      await updateJobCard(editingJob.id, {
+        bayNumber: Number(editBayNumber),
+        customerName: editCustomerName.trim(),
+        customerPhone: editCustomerPhone.trim() || undefined,
+        bikeModel: editBikeModel,
+        bikeRegNumber: editBikeRegNumber.trim(),
+        complaintDescription: editComplaint.trim() || undefined,
+        assignedMechanicId: editMechanicId || undefined,
+        assignedMechanicName: mech ? mech.name : undefined,
+      });
+      setEditingJob(null);
+    } catch (err: any) {
+      setEditJobError(err.message || "Job Card update karne mein masla aaya.");
+    }
+  };
+
+  const handleDeleteJobCard = async (job: VehicleJobCard) => {
+    if (confirm(`Kya aap Job Card #${job.jobCardNumber} (${job.bikeRegNumber}) ko delete karna chahte hain?`)) {
+      try {
+        await deleteJobCard(job.id);
+      } catch (err: any) {
+        alert(err.message || "Job Card delete karne mein masla aaya.");
+      }
+    }
+  };
 
   // Handle open New Job Modal: Auto pick next free Bay (1 to 10)
   const handleOpenNewJobModal = () => {
@@ -498,9 +557,27 @@ export default function WorkshopBayPage() {
                         <option value="Ready for Bill">✅ Tayyar (Bill Banayein)</option>
                       </select>
                     )}
-                    <span className="text-[10px] font-mono text-slate-400">
-                      Card: {job.jobCardNumber}
-                    </span>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-[10px] font-mono text-slate-400">
+                        Card: {job.jobCardNumber}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditJob(job)}
+                        className="p-1 text-slate-400 hover:text-blue-600 rounded hover:bg-blue-50 transition"
+                        title="Job Card Details Edit Karein"
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteJobCard(job)}
+                        className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 transition"
+                        title="Job Card Delete Karein"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1252,6 +1329,138 @@ export default function WorkshopBayPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* --- EDIT JOB CARD DETAILS MODAL --- */}
+      <Modal
+        isOpen={Boolean(editingJob)}
+        onClose={() => setEditingJob(null)}
+        title={`Job Card Details Edit Karein — #${editingJob?.jobCardNumber}`}
+        description="Gahak ka naam, bike model, number plate aur assigned mechanic tabdeel karein"
+        maxWidth="lg"
+      >
+        <form onSubmit={handleUpdateJobSubmit} className="space-y-4">
+          {editJobError && (
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold">
+              {editJobError}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Bay Number (1 - 10) *
+              </label>
+              <select
+                value={editBayNumber}
+                onChange={(e) => setEditBayNumber(Number(e.target.value))}
+                className="w-full h-10 px-3 text-xs bg-white border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-blue-500"
+              >
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                  <option key={num} value={num}>
+                    Bay {num.toString().padStart(2, "0")}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <Input
+              label="Gahak Ka Naam *"
+              value={editCustomerName}
+              onChange={(e) => setEditCustomerName(e.target.value)}
+              required
+              className="text-xs font-bold"
+            />
+
+            <Input
+              label="Customer Phone (رابطہ نمبر)"
+              value={editCustomerPhone}
+              onChange={(e) => setEditCustomerPhone(e.target.value)}
+              className="text-xs font-mono"
+            />
+
+            <Input
+              label="Motorcycle Reg / Plate # *"
+              value={editBikeRegNumber}
+              onChange={(e) => setEditBikeRegNumber(e.target.value)}
+              required
+              className="text-xs font-mono font-bold uppercase"
+            />
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Bike Model *
+              </label>
+              <select
+                value={editBikeModel}
+                onChange={(e) => setEditBikeModel(e.target.value)}
+                className="w-full h-10 px-3 text-xs bg-white border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Honda CD 70">Honda CD 70</option>
+                <option value="Honda CG 125">Honda CG 125</option>
+                <option value="Honda Pridor 100">Honda Pridor 100</option>
+                <option value="Honda CB 150F">Honda CB 150F</option>
+                <option value="Yamaha YBR 125">Yamaha YBR 125</option>
+                <option value="Yamaha YB 125Z">Yamaha YB 125Z</option>
+                <option value="Suzuki GS 150">Suzuki GS 150</option>
+                <option value="Suzuki GR 150">Suzuki GR 150</option>
+                <option value="Road Prince 70">Road Prince 70</option>
+                <option value="United 70">United 70</option>
+                <option value="Super Power 70">Super Power 70</option>
+                <option value="Crown Lifan">Crown Lifan</option>
+                <option value="Universal / Other">Universal / Other</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Assigned Mechanic (مکینک)
+              </label>
+              <select
+                value={editMechanicId}
+                onChange={(e) => setEditMechanicId(e.target.value)}
+                className="w-full h-10 px-3 text-xs bg-white border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">-- Mechanic Muntakhib Karein --</option>
+                {mechanics.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} ({m.specialty || "Mechanic"})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Shikayat / Masla (Complaint / Work Description)
+            </label>
+            <textarea
+              value={editComplaint}
+              onChange={(e) => setEditComplaint(e.target.value)}
+              rows={2}
+              className="w-full p-3 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 font-medium"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={() => setEditingJob(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              type="submit"
+              className="font-bold gap-2 bg-blue-600 hover:bg-blue-700"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Tabdeeli Mahfooz Karein
+            </Button>
+          </div>
+        </form>
       </Modal>
 
       {/* --- RECEIPT PRINT MODAL --- */}

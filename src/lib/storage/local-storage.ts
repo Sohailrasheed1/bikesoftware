@@ -22,13 +22,13 @@ import {
 import { daysSince } from "../utils";
 
 const STORAGE_KEYS = {
-  PARTS: "skander_parts_v1",
-  CUSTOMERS: "skander_customers_v1",
-  BILLS: "skander_bills_v1",
-  SUPPLIER_CREDITS: "skander_supplier_credits_v1",
-  MECHANICS: "skander_mechanics_v1",
-  MECHANIC_LEDGER: "skander_mechanic_ledger_v1",
-  JOB_CARDS: "skander_job_cards_v1",
+  PARTS: "gilani_autos_parts_v1",
+  CUSTOMERS: "gilani_autos_customers_v1",
+  BILLS: "gilani_autos_bills_v1",
+  SUPPLIER_CREDITS: "gilani_autos_supplier_credits_v1",
+  MECHANICS: "gilani_autos_mechanics_v1",
+  MECHANIC_LEDGER: "gilani_autos_mechanic_ledger_v1",
+  JOB_CARDS: "gilani_autos_job_cards_v1",
 };
 
 export class LocalStorageService implements IStorageService {
@@ -301,6 +301,16 @@ export class LocalStorageService implements IStorageService {
     // 4. Mark Bill as Cancelled
     bill.status = "Cancelled";
     this.setItem(STORAGE_KEYS.BILLS, bills);
+    return true;
+  }
+
+  async deleteBill(id: string): Promise<boolean> {
+    const bills = await this.getBills();
+    const filtered = bills.filter((b) => b.id !== id);
+    this.setItem(STORAGE_KEYS.BILLS, filtered);
+    const ledger = await this.getMechanicLedger();
+    const filteredLedger = ledger.filter((l) => l.billId !== id);
+    this.setItem(STORAGE_KEYS.MECHANIC_LEDGER, filteredLedger);
     return true;
   }
 
@@ -664,6 +674,31 @@ export class LocalStorageService implements IStorageService {
 
     this.setItem(STORAGE_KEYS.SUPPLIER_CREDITS, credits);
     return credit;
+  }
+
+  async updateSupplierCredit(id: string, updates: Partial<SupplierCredit>): Promise<SupplierCredit> {
+    const credits = await this.getSupplierCredits();
+    const idx = credits.findIndex((c) => c.id === id);
+    if (idx === -1) throw new Error("Supplier credit entry not found");
+
+    const current = credits[idx];
+    const totalAmount = updates.totalAmount !== undefined ? updates.totalAmount : current.totalAmount;
+    const paidAmount = updates.paidAmount !== undefined ? updates.paidAmount : current.paidAmount;
+    const remainingBalance = Math.max(0, totalAmount - paidAmount);
+    const status = remainingBalance === 0 ? "Paid" : paidAmount > 0 ? "Partial" : "Pending";
+
+    const updated: SupplierCredit = {
+      ...current,
+      ...updates,
+      totalAmount,
+      paidAmount,
+      remainingBalance,
+      status,
+      updatedAt: new Date().toISOString(),
+    };
+    credits[idx] = updated;
+    this.setItem(STORAGE_KEYS.SUPPLIER_CREDITS, credits);
+    return updated;
   }
 
   async deleteSupplierCredit(id: string): Promise<boolean> {

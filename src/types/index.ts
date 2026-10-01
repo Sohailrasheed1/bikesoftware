@@ -38,6 +38,7 @@ export interface Part {
   supplierName: string;
   supplierPhone?: string;
   location?: string; // Shelf / Bin e.g. "Rack A-2"
+  shopId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -52,6 +53,7 @@ export interface Customer {
   notes?: string;
   totalSpent: number;
   totalVisits: number;
+  shopId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -98,6 +100,7 @@ export interface Bill {
   paymentMethod: "Cash" | "EasyPaisa / JazzCash" | "Bank Transfer" | "Udhaar / Credit";
   notes?: string;
   status: "Completed" | "Cancelled";
+  shopId?: string;
   createdAt: string; // ISO date string
 }
 
@@ -107,6 +110,7 @@ export interface Mechanic {
   phone: string;
   specialty?: string;
   defaultShopCutPercentage: number; // e.g. 30% for shop owner
+  shopId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -129,6 +133,7 @@ export interface MechanicLedgerEntry {
   shopAmount: number;
   mechanicAmount: number;
   notes?: string;
+  shopId?: string;
 }
 
 export interface VehicleJobCard {
@@ -146,6 +151,7 @@ export interface VehicleJobCard {
   items: BillItem[];     // Live parts installed so far
   labourItems: BillLabourItem[]; // Live labor charges
   estimatedSubtotal: number;
+  shopId?: string;
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
@@ -173,6 +179,30 @@ export interface SupplierCredit {
   dueDate: string;        // Payment due date
   status: "Pending" | "Partial" | "Paid";
   paymentHistory: SupplierPayment[];
+  shopId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type UserRole = "superadmin" | "admin" | "staff";
+
+export interface Shop {
+  id: string; // e.g. "shop-sikandar", "shop-1712345678"
+  slug: string;
+  name: string; // e.g. "Sikander Spare Parts"
+  urduName?: string; // e.g. "سکندر اسپیئر پارٹس"
+  ownerName: string;
+  phone: string;
+  address: string;
+  city: string;
+  status: "active" | "suspended" | "expired";
+  monthlyRent: number; // in PKR
+  billingCycle: "monthly" | "quarterly" | "yearly";
+  subscriptionStart: string; // ISO date
+  subscriptionEnd: string; // ISO date
+  adminUserId?: string;
+  adminUsername?: string;
+  notes?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -181,7 +211,32 @@ export interface User {
   id: string;
   name: string;
   username: string;
-  role: "admin" | "staff";
+  role: UserRole;
+  shopId?: string;
+  shopName?: string;
+}
+
+export interface DbUser {
+  id: string;
+  username: string;
+  email: string;
+  name: string;
+  passwordHash: string; // Cryptographically hashed with bcrypt
+  role: UserRole;
+  shopId?: string; // undefined for superadmin, shop ID for clients
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaaSStats {
+  totalShops: number;
+  activeShops: number;
+  suspendedShops: number;
+  expiringIn7Days: number;
+  monthlyRecurringRevenue: number;
+  totalSystemBills: number;
+  totalSystemSales: number;
+  totalSystemParts: number;
 }
 
 export interface DashboardStats {

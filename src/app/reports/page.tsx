@@ -113,7 +113,7 @@ export default function ReportsPage() {
     link.setAttribute("href", encodedUri);
     link.setAttribute(
       "download",
-      `skander_parts_report_${reportType}_${todayStr}.csv`
+      `gilani_autos_report_${reportType}_${todayStr}.csv`
     );
     document.body.appendChild(link);
     link.click();

@@ -54,6 +54,53 @@ export default function MechanicsPage() {
   const [defaultShopCutPercentage, setDefaultShopCutPercentage] = useState<number>(30);
   const [addError, setAddError] = useState("");
 
+  // Edit Mechanic Modal State
+  const [editingMechanic, setEditingMechanic] = useState<Mechanic | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editSpecialty, setEditSpecialty] = useState("");
+  const [editShopCut, setEditShopCut] = useState<number>(30);
+  const [editError, setEditError] = useState("");
+
+  const handleOpenEditMechanic = (mech: Mechanic) => {
+    setEditingMechanic(mech);
+    setEditName(mech.name);
+    setEditPhone(mech.phone);
+    setEditSpecialty(mech.specialty || "");
+    setEditShopCut(mech.defaultShopCutPercentage || 30);
+    setEditError("");
+  };
+
+  const handleEditMechanicSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMechanic) return;
+    if (!editName.trim()) {
+      setEditError("Mechanic ka naam likhna zaroori hai.");
+      return;
+    }
+    try {
+      await updateMechanic(editingMechanic.id, {
+        name: editName.trim(),
+        phone: editPhone.trim() || "0300-0000000",
+        specialty: editSpecialty.trim() || undefined,
+        defaultShopCutPercentage: Number(editShopCut) || 30,
+      });
+      setEditingMechanic(null);
+    } catch (err: any) {
+      setEditError(err.message || "Mechanic update karne mein masla aaya.");
+    }
+  };
+
+  const handleDeleteMechanic = async (id: string, mechName: string) => {
+    if (confirm(`Kya aap waqai mechanic "${mechName}" ko delete karna chahte hain?`)) {
+      try {
+        await deleteMechanic(id);
+      } catch (err: any) {
+        alert(err.message || "Delete karne mein masla aaya.");
+      }
+    }
+  };
+
   // Payout Modal
   const [payoutAmount, setPayoutAmount] = useState<number | "">("");
   const [payoutNotes, setPayoutNotes] = useState("");
@@ -309,9 +356,27 @@ export default function MechanicsPage() {
                   </div>
                 </div>
 
-                <span className="text-xs font-black px-2.5 py-1 rounded-xl bg-slate-100 text-slate-700 border border-slate-200">
-                  Shop: {mech.defaultShopCutPercentage}%
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-black px-2.5 py-1 rounded-xl bg-slate-100 text-slate-700 border border-slate-200">
+                    Shop: {mech.defaultShopCutPercentage}%
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditMechanic(mech)}
+                    className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-indigo-50 transition"
+                    title="Mechanic Edit Karein"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteMechanic(mech.id, mech.name)}
+                    className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition"
+                    title="Mechanic Delete Karein"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
               {/* Financial Stats */}
@@ -464,6 +529,77 @@ export default function MechanicsPage() {
         </form>
       </Modal>
 
+      {/* --- MODAL 1B: Mechanic Record Edit Karein --- */}
+      <Modal
+        isOpen={Boolean(editingMechanic)}
+        onClose={() => setEditingMechanic(null)}
+        title={`Mechanic Update Karein — ${editingMechanic?.name}`}
+        description="Mechanic ki details aur shop cut percentage tabdeel karein"
+        maxWidth="md"
+      >
+        <form onSubmit={handleEditMechanicSubmit} className="space-y-4">
+          {editError && (
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold">
+              {editError}
+            </div>
+          )}
+
+          <Input
+            label="Mechanic Ka Naam (Ustad) *"
+            placeholder="e.g. Ustad Rashid"
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            required
+            className="text-xs"
+          />
+
+          <Input
+            label="Phone Number (رابطہ نمبر)"
+            placeholder="0300-1234567"
+            value={editPhone}
+            onChange={(e) => setEditPhone(e.target.value)}
+            className="text-xs font-mono"
+          />
+
+          <Input
+            label="Specialty / Hunar"
+            placeholder="e.g. Engine Master & Tuning"
+            value={editSpecialty}
+            onChange={(e) => setEditSpecialty(e.target.value)}
+            className="text-xs"
+          />
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-700 block">
+              Shop Malik Commission Cut (% فی صد) *
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={editShopCut}
+                onChange={(e) => setEditShopCut(Number(e.target.value))}
+                className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold"
+              />
+              <span className="absolute right-3 top-2 text-xs font-bold text-slate-400">
+                %
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+            <Button variant="secondary" type="button" onClick={() => setEditingMechanic(null)}>
+              Cancel
+            </Button>
+            <Button variant="primary" type="submit" className="font-bold gap-2 bg-indigo-600 hover:bg-indigo-700">
+              <CheckCircle2 className="h-4 w-4" />
+              Tabdeeli Mahfooz Karein
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
       {/* --- MODAL 2: Ujrat Ada Karein (Record Payout) --- */}
       <Modal
         isOpen={Boolean(selectedMechanicForPayout)}
@@ -557,7 +693,7 @@ export default function MechanicsPage() {
                 {/* Header for Print */}
                 <div className="text-center pb-3 border-b border-dashed border-slate-300">
                   <h2 className="text-base sm:text-lg font-black tracking-tight uppercase text-slate-900">
-                    SKANDER SPARE PARTS — MECHANIC KHATA
+                    GILANI AUTOS — MECHANIC KHATA
                   </h2>
                   <p className="text-xs font-bold text-indigo-700">
                     Mechanic: {selectedMechanicForLedger.name} ({selectedMechanicForLedger.phone})

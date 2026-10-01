@@ -31,6 +31,7 @@ export interface IStorageService {
   getBill(id: string): Promise<Bill | null>;
   createBill(bill: Omit<Bill, "id" | "billNumber" | "createdAt" | "status">): Promise<Bill>;
   cancelBill(id: string): Promise<boolean>;
+  deleteBill(id: string): Promise<boolean>;
 
   // Mechanics & Mechanic Ledger (کھاتہ)
   getMechanics(): Promise<Mechanic[]>;
@@ -81,6 +82,7 @@ export interface IStorageService {
   getSupplierCredits(): Promise<SupplierCredit[]>;
   getSupplierCredit(id: string): Promise<SupplierCredit | null>;
   createSupplierCredit(credit: Omit<SupplierCredit, "id" | "paidAmount" | "remainingBalance" | "status" | "paymentHistory" | "createdAt" | "updatedAt">): Promise<SupplierCredit>;
+  updateSupplierCredit(id: string, updates: Partial<SupplierCredit>): Promise<SupplierCredit>;
   recordSupplierPayment(creditId: string, amount: number, notes?: string): Promise<SupplierCredit>;
   deleteSupplierCredit(id: string): Promise<boolean>;
 
