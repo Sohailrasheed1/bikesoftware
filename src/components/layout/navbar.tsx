@@ -15,6 +15,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { LanguageSwitch } from "@/components/ui/language-switch";
+import { PWAInstallButton } from "@/components/ui/pwa-install-button";
 import { useLanguage } from "@/lib/i18n/context";
 import { useSession, signOut } from "next-auth/react";
 import { useStore } from "@/lib/storage/context";
@@ -100,8 +101,11 @@ export function Navbar() {
           )}
         </div>
 
-        {/* 2. Right: Demo Data Reset + Offline/Online Status + SuperAdmin link + Language Switch + User Role + Logout */}
+        {/* 2. Right: PWA Install + Demo Data Reset + Offline/Online Status + SuperAdmin link + Language Switch + User Role + Logout */}
         <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
+          {/* PWA Install Button */}
+          <PWAInstallButton />
+
           {/* Demo Data Reset Button */}
           <button
             type="button"
