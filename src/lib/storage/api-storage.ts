@@ -86,6 +86,7 @@ export class ApiStorageService implements IStorageService {
     costPrice: number;
     supplier: string;
     notes?: string;
+    newSellingPrice?: number;
   }): Promise<PurchaseBatch> {
     return this.request<PurchaseBatch>("/api/parts/batches", {
       method: "POST",

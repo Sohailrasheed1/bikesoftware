@@ -23,7 +23,7 @@ import {
   SEED_MECHANIC_LEDGER,
   SEED_JOB_CARDS,
 } from "./seed-data";
-import { daysSince } from "../utils";
+import { daysSince, getLocalDateString } from "../utils";
 
 const STORAGE_KEYS = {
   PARTS: "jilani_autos_parts_v1",
@@ -152,6 +152,7 @@ export class LocalStorageService implements IStorageService {
     costPrice: number;
     supplier: string;
     notes?: string;
+    newSellingPrice?: number;
   }): Promise<PurchaseBatch> {
     const batches = await this.getPurchaseBatches();
     const part = await this.getPart(batchData.partId);
@@ -161,7 +162,7 @@ export class LocalStorageService implements IStorageService {
       id: `batch-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       partId: batchData.partId,
       partName,
-      purchaseDate: batchData.purchaseDate || new Date().toISOString(),
+      purchaseDate: batchData.purchaseDate || getLocalDateString(),
       qtyPurchased: Number(batchData.qtyPurchased) || 0,
       qtyRemaining: Number(batchData.qtyPurchased) || 0,
       costPrice: Number(batchData.costPrice) || 0,
@@ -181,6 +182,10 @@ export class LocalStorageService implements IStorageService {
       await this.updatePart(batchData.partId, {
         currentStock: totalRemaining,
         purchasePrice: batchData.costPrice > 0 ? batchData.costPrice : part.purchasePrice,
+        sellingPrice:
+          batchData.newSellingPrice && batchData.newSellingPrice > 0
+            ? batchData.newSellingPrice
+            : part.sellingPrice,
       });
     }
 
@@ -188,16 +193,26 @@ export class LocalStorageService implements IStorageService {
   }
 
   async getPurchaseRateHistory(partId?: string): Promise<RateHistoryEntry[]> {
-    const batches = await this.getPurchaseBatches(partId);
+    let targetPartName: string | undefined = undefined;
+    if (partId) {
+      const p = await this.getPart(partId);
+      if (p) targetPartName = p.name.trim().toLowerCase();
+    }
+
+    const batches = await this.getPurchaseBatches();
     const grouped: Record<string, PurchaseBatch[]> = {};
     for (const b of batches) {
-      if (!grouped[b.partId]) grouped[b.partId] = [];
-      grouped[b.partId].push(b);
+      const normName = (b.partName || "Unknown").trim().toLowerCase();
+      if (partId && b.partId !== partId && normName !== targetPartName) {
+        continue;
+      }
+      if (!grouped[normName]) grouped[normName] = [];
+      grouped[normName].push(b);
     }
 
     const history: RateHistoryEntry[] = [];
-    for (const pId of Object.keys(grouped)) {
-      const pBatches = grouped[pId].sort(
+    for (const nameKey of Object.keys(grouped)) {
+      const pBatches = grouped[nameKey].sort(
         (a, b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime()
       );
       let prevCost: number | undefined = undefined;

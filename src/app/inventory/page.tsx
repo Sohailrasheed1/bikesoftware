@@ -36,7 +36,8 @@ import { Modal } from "@/components/ui/modal";
 import { useStore } from "@/lib/storage/context";
 import { useLanguage } from "@/lib/i18n/context";
 import { Part, PartCategory, PurchaseBatch, RateHistoryEntry } from "@/types";
-import { formatPKR, formatDate, formatCompatibleModels, toModelArray } from "@/lib/utils";
+import { formatPKR, formatDate, formatCompatibleModels, toModelArray, getLocalDateString } from "@/lib/utils";
+import { useToast } from "@/components/providers/toast-provider";
 
 const CATEGORIES: { label: string; value: PartCategory }[] = [
   { label: "Engine & Transmission", value: "Engine & Transmission" },
@@ -65,6 +66,7 @@ export default function InventoryPage() {
     recordStockAdjustment,
   } = useStore();
   const { t, isUrdu } = useLanguage();
+  const { toast } = useToast();
 
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
@@ -73,6 +75,7 @@ export default function InventoryPage() {
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingPart, setEditingPart] = useState<Part | null>(null);
+  const [partToDelete, setPartToDelete] = useState<Part | null>(null);
 
   // FIFO Modals state
   const [isNewBatchModalOpen, setIsNewBatchModalOpen] = useState(false);
@@ -90,8 +93,9 @@ export default function InventoryPage() {
     partId: "",
     qtyPurchased: 10,
     costPrice: 0,
+    sellingPrice: 0,
     supplier: "",
-    purchaseDate: new Date().toISOString().split("T")[0],
+    purchaseDate: getLocalDateString(),
     notes: "",
   });
 
@@ -162,8 +166,9 @@ export default function InventoryPage() {
       partId: targetPart ? targetPart.id : "",
       qtyPurchased: 10,
       costPrice: targetPart ? targetPart.purchasePrice : 0,
+      sellingPrice: targetPart ? targetPart.sellingPrice : 0,
       supplier: targetPart ? targetPart.supplierName : "",
-      purchaseDate: new Date().toISOString().split("T")[0],
+      purchaseDate: getLocalDateString(),
       notes: "",
     });
     setIsNewBatchModalOpen(true);
@@ -197,85 +202,138 @@ export default function InventoryPage() {
 
   const handleSubmitPart = async (e: React.FormEvent) => {
     e.preventDefault();
+    const duplicatePart = !editingPart && formData.name.trim()
+      ? parts.find((p) => p.name.trim().toLowerCase() === formData.name.trim().toLowerCase())
+      : null;
+
+    if (!editingPart && duplicatePart) {
+      toast.warning("Duplicate Item", `"${duplicatePart.name}" pehle se inventory mein mojood hai!`);
+      return;
+    }
+
     const models = formData.compatibleModels
       .split(",")
       .map((m) => m.trim())
       .filter(Boolean);
 
-    if (editingPart) {
-      await updatePart(editingPart.id, {
-        name: formData.name,
-        category: formData.category,
-        sku: formData.sku || undefined,
-        compatibleModels: models,
-        purchasePrice: Number(formData.purchasePrice) || 0,
-        sellingPrice: Number(formData.sellingPrice) || 0,
-        currentStock: Number(formData.currentStock) || 0,
-        minStockLimit: Number(formData.minStockLimit) || 0,
-        supplierName: formData.supplierName,
-        supplierPhone: formData.supplierPhone || undefined,
-        location: formData.location || undefined,
-      });
-    } else {
-      await addPart({
-        name: formData.name,
-        category: formData.category,
-        sku: formData.sku || undefined,
-        compatibleModels: models,
-        purchasePrice: Number(formData.purchasePrice) || 0,
-        sellingPrice: Number(formData.sellingPrice) || 0,
-        currentStock: Number(formData.currentStock) || 0,
-        minStockLimit: Number(formData.minStockLimit) || 0,
-        supplierName: formData.supplierName || "Local Supplier",
-        supplierPhone: formData.supplierPhone || undefined,
-        location: formData.location || undefined,
-      });
-    }
+    const partName = formData.name;
+    const isEdit = !!editingPart;
+    const partPayload = {
+      name: formData.name,
+      category: formData.category,
+      sku: formData.sku || undefined,
+      compatibleModels: models,
+      purchasePrice: Number(formData.purchasePrice) || 0,
+      sellingPrice: Number(formData.sellingPrice) || 0,
+      currentStock: Number(formData.currentStock) || 0,
+      minStockLimit: Number(formData.minStockLimit) || 0,
+      supplierName: formData.supplierName || "Local Supplier",
+      supplierPhone: formData.supplierPhone || undefined,
+      location: formData.location || undefined,
+    };
+
+    // Close modal INSTANTLY (0ms lag!)
     setIsAddModalOpen(false);
+
+    try {
+      if (isEdit && editingPart) {
+        await updatePart(editingPart.id, partPayload);
+        toast.success("Item Update Ho Gaya", `"${partName}" ki nayi maloomat save ho gayi hain.`);
+      } else {
+        await addPart(partPayload);
+        toast.success("Naya Item Shamil Hua", `"${partName}" ko stock mein shamil kar diya gaya.`);
+      }
+    } catch (err: any) {
+      toast.error("Save Error", err.message || "Part save nahi ho saka.");
+    }
   };
 
   const handleSubmitNewBatch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!batchForm.partId) return;
 
-    await createPurchaseBatch({
+    const payload = {
       partId: batchForm.partId,
       qtyPurchased: Number(batchForm.qtyPurchased) || 0,
       costPrice: Number(batchForm.costPrice) || 0,
       supplier: batchForm.supplier || "General Supplier",
       purchaseDate: batchForm.purchaseDate,
       notes: batchForm.notes,
-    });
+      newSellingPrice: Number(batchForm.sellingPrice) || undefined,
+    };
 
+    const targetPart = parts.find((p) => p.id === batchForm.partId);
+    const itemName = targetPart?.name || "Item";
+
+    // Close modal INSTANTLY (0ms lag!)
     setIsNewBatchModalOpen(false);
+
+    try {
+      await createPurchaseBatch(payload);
+      toast.success("Nayi Batch Save Ho Gayi", `${itemName} ka ${payload.qtyPurchased} stock shamil ho gaya.`);
+    } catch (err: any) {
+      toast.error("Batch Error", err.message || "Batch save nahi ho saki.");
+    }
   };
 
   const handleSubmitReturn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!returnForm.partId) return;
 
-    if (returnForm.type === "purchase_return") {
-      await recordPurchaseReturn({
-        partId: returnForm.partId,
-        batchId: returnForm.batchId || undefined,
-        quantity: Number(returnForm.quantity) || 1,
-        reason: returnForm.reason,
-        supplier: returnForm.supplier,
-      });
-    } else {
-      await recordStockAdjustment({
-        partId: returnForm.partId,
-        batchId: returnForm.batchId || undefined,
-        quantity: -Math.abs(Number(returnForm.quantity) || 1),
-        reason: returnForm.reason,
-      });
-    }
+    const returnType = returnForm.type;
+    const qty = Number(returnForm.quantity) || 1;
+    const targetPart = parts.find((p) => p.id === returnForm.partId);
+    const itemName = targetPart?.name || "Item";
+
+    // Close modal INSTANTLY (0ms lag!)
     setIsReturnModalOpen(false);
+
+    try {
+      if (returnType === "purchase_return") {
+        await recordPurchaseReturn({
+          partId: returnForm.partId,
+          batchId: returnForm.batchId || undefined,
+          quantity: qty,
+          reason: returnForm.reason,
+          supplier: returnForm.supplier,
+        });
+        toast.success("Purchase Return Darj", `${itemName} ke ${qty} pieces supplier ko wapas darj ho gaye.`);
+      } else {
+        await recordStockAdjustment({
+          partId: returnForm.partId,
+          batchId: returnForm.batchId || undefined,
+          quantity: -Math.abs(qty),
+          reason: returnForm.reason,
+        });
+        toast.success("Stock Adjustment Darj", `${itemName} ke ${qty} pieces kharabi/waste mein adjust ho gaye.`);
+      }
+    } catch (err: any) {
+      toast.error("Adjustment Error", err.message || "Entry save nahi ho saki.");
+    }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (confirm(`Kya aap waqai "${name}" ko stock list se delete karna chahte hain?`)) {
-      await deletePart(id);
+  const confirmDeletePart = async () => {
+    if (!partToDelete) return;
+    const deleting = partToDelete;
+    setPartToDelete(null);
+    try {
+      await deletePart(deleting.id);
+      toast.success("Item Delete Ho Gaya", `"${deleting.name}" ko inventory se kamyabi se hata diya gaya.`);
+    } catch (err: any) {
+      toast.error("Delete Error", err.message || "Item delete nahi ho saka.");
+    }
+  };
+
+  const handleQuickStock = async (part: Part, delta: number) => {
+    try {
+      await updateStock(part.id, delta);
+      toast.info(
+        delta > 0 ? "Stock Barha Diya" : "Stock Kam Kiya",
+        `${part.name} ka stock ab ${part.currentStock + delta} hai.`,
+        2000
+      );
+    } catch (err: any) {
+      toast.error("Stock Error", err.message || "Stock update nahi ho saka.");
     }
   };
 
@@ -329,7 +387,7 @@ export default function InventoryPage() {
             className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 font-bold text-xs h-10"
           >
             <PackagePlus className="h-4 w-4 mr-1.5" />
-            + Nayi Purchase Batch
+            Nayi Purchase Batch
           </Button>
 
           {/* Rule 6: Rate History Report */}
@@ -575,8 +633,8 @@ export default function InventoryPage() {
                         <div className="inline-flex items-center gap-1.5">
                           <button
                             type="button"
-                            onClick={() => updateStock(part.id, -1)}
-                            className="text-slate-400 hover:text-slate-700 p-0.5"
+                            onClick={() => handleQuickStock(part, -1)}
+                            className="text-slate-400 hover:text-slate-700 p-0.5 active:scale-90 transition"
                             title="Stock 1 kam karein"
                           >
                             <MinusCircle className="h-4 w-4" />
@@ -594,8 +652,8 @@ export default function InventoryPage() {
                           </span>
                           <button
                             type="button"
-                            onClick={() => updateStock(part.id, 1)}
-                            className="text-slate-400 hover:text-slate-700 p-0.5"
+                            onClick={() => handleQuickStock(part, 1)}
+                            className="text-slate-400 hover:text-slate-700 p-0.5 active:scale-90 transition"
                             title="Stock 1 barhayein"
                           >
                             <PlusCircle className="h-4 w-4" />
@@ -650,7 +708,7 @@ export default function InventoryPage() {
                             <Edit className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => handleDelete(part.id, part.name)}
+                            onClick={() => setPartToDelete(part)}
                             className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition"
                             title="Delete Part"
                           >
@@ -666,6 +724,50 @@ export default function InventoryPage() {
           </table>
         </div>
       </Card>
+
+      {/* THEMED DELETE CONFIRMATION MODAL */}
+      <Modal
+        isOpen={!!partToDelete}
+        onClose={() => setPartToDelete(null)}
+        title="Item Delete Karein?"
+        description="Yeh amal wapas nahi kiya ja sakega."
+        maxWidth="md"
+      >
+        <div className="space-y-4">
+          <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 flex items-start gap-3.5">
+            <div className="p-2.5 bg-rose-100 rounded-xl text-rose-600 shrink-0">
+              <AlertTriangle className="h-6 w-6" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-rose-950">
+                {partToDelete?.name}
+              </h3>
+              <p className="text-xs text-rose-700 mt-1 leading-relaxed">
+                Kya aap waqai is item ko inventory se mukammal tor par delete karna chahte hain? Is se juda stock aur records hata diye jayenge.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setPartToDelete(null)}
+              className="text-xs font-semibold h-10 px-4"
+            >
+              Cancel (Wapas)
+            </Button>
+            <Button
+              type="button"
+              onClick={confirmDeletePart}
+              className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs h-10 px-4 shadow-md shadow-rose-600/20"
+            >
+              <Trash2 className="h-4 w-4 mr-1.5" />
+              Haan, Delete Karein
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* MODAL 1: Add / Edit Item */}
       <Modal
@@ -683,6 +785,34 @@ export default function InventoryPage() {
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             placeholder="e.g. Atlas Honda Piston 70cc Standard"
           />
+
+          {!editingPart && formData.name.trim() && parts.some((p) => p.name.trim().toLowerCase() === formData.name.trim().toLowerCase()) && (() => {
+            const dup = parts.find((p) => p.name.trim().toLowerCase() === formData.name.trim().toLowerCase());
+            if (!dup) return null;
+            return (
+              <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-amber-900 text-xs space-y-2 animate-in fade-in">
+                <div className="flex items-center gap-1.5 font-bold text-amber-800">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
+                  <span>Khabardaar: Yeh item pehle se inventory mein mojood hai!</span>
+                </div>
+                <p className="text-[11px] text-amber-700 leading-relaxed">
+                  <strong>{dup.name}</strong> pehle se darj hai (Stock: <strong>{dup.currentStock}</strong>, Purani Kharid: <strong>{formatPKR(dup.purchasePrice)}</strong>, Purani Bikri: <strong>{formatPKR(dup.sellingPrice)}</strong>). Agar naya maal ya naya rate aaya hai to naya part banane ke bajaye <strong>Nayi Purchase Batch</strong> banayein taake Rate History theek rahe.
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    setIsAddModalOpen(false);
+                    handleOpenNewBatch(dup.id);
+                  }}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-8"
+                >
+                  <PackagePlus className="h-3.5 w-3.5 mr-1.5" />
+                  Is Item Ki Nayi Purchase Batch Banayein
+                </Button>
+              </div>
+            );
+          })()}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
@@ -804,7 +934,7 @@ export default function InventoryPage() {
       <Modal
         isOpen={isNewBatchModalOpen}
         onClose={() => setIsNewBatchModalOpen(false)}
-        title="+ Nayi Purchase Batch (Buy Stock)"
+        title="Nayi Purchase Batch (Buy Stock)"
         description="Har purchase par Nayi Batch Entry banti hai (Purani batch update/delete nahi hoti)"
         maxWidth="lg"
       >
@@ -836,7 +966,7 @@ export default function InventoryPage() {
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <Input
               label="Purchase Quantity (Tadad) *"
               type="number"
@@ -849,7 +979,7 @@ export default function InventoryPage() {
             />
 
             <Input
-              label="Cost Price Per Unit (Rs) *"
+              label="Cost Price / Nayi Kharid (Rs) *"
               type="number"
               required
               min="0"
@@ -860,13 +990,16 @@ export default function InventoryPage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <Input
-              label="Supplier Name *"
+              label="Nayi Bikri Qeemat / Selling Price (Rs) *"
+              type="number"
               required
-              value={batchForm.supplier}
-              onChange={(e) => setBatchForm({ ...batchForm, supplier: e.target.value })}
-              placeholder="e.g. Akbar Autos Saddar"
+              min="0"
+              value={batchForm.sellingPrice}
+              onChange={(e) =>
+                setBatchForm({ ...batchForm, sellingPrice: Number(e.target.value) || 0 })
+              }
             />
 
             <Input
@@ -878,12 +1011,44 @@ export default function InventoryPage() {
             />
           </div>
 
-          <Input
-            label="Notes / Invoice Ref (Optional)"
-            value={batchForm.notes}
-            onChange={(e) => setBatchForm({ ...batchForm, notes: e.target.value })}
-            placeholder="e.g. Invoice # 8291, Cash Purchase"
-          />
+          {/* Price & Profit Comparison Preview Box */}
+          {(() => {
+            const selected = parts.find((p) => p.id === batchForm.partId);
+            if (!selected) return null;
+            const newMargin = Number(batchForm.sellingPrice) - Number(batchForm.costPrice);
+            const oldMargin = selected.sellingPrice - selected.purchasePrice;
+            return (
+              <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-xs space-y-1.5">
+                <div className="flex items-center justify-between font-bold text-slate-800">
+                  <span>Purana Rate: {formatPKR(selected.purchasePrice)} Kharid / {formatPKR(selected.sellingPrice)} Bikri</span>
+                  <span className="text-slate-500 font-semibold">(Munafa: +{formatPKR(oldMargin)})</span>
+                </div>
+                <div className="flex items-center justify-between font-extrabold text-blue-900 border-t border-blue-100 pt-1">
+                  <span>Naya Rate: {formatPKR(Number(batchForm.costPrice) || 0)} Kharid / {formatPKR(Number(batchForm.sellingPrice) || 0)} Bikri</span>
+                  <span className={newMargin >= 0 ? "text-emerald-700 font-black" : "text-rose-700 font-black"}>
+                    Naya Munafa: {newMargin >= 0 ? "+" : ""}{formatPKR(newMargin)} per unit
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <Input
+              label="Supplier Name *"
+              required
+              value={batchForm.supplier}
+              onChange={(e) => setBatchForm({ ...batchForm, supplier: e.target.value })}
+              placeholder="e.g. Akbar Autos Saddar"
+            />
+
+            <Input
+              label="Notes / Invoice Ref (Optional)"
+              value={batchForm.notes}
+              onChange={(e) => setBatchForm({ ...batchForm, notes: e.target.value })}
+              placeholder="e.g. Invoice # 8291, Cash Purchase"
+            />
+          </div>
 
           <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
             <Button
@@ -906,7 +1071,7 @@ export default function InventoryPage() {
         onClose={() => setIsRateHistoryModalOpen(false)}
         title="ريٹ ہسٹری (Purchase Rate History Report)"
         description="Har item ke purchase rates date-wise check karein aur price changes highlight hote hain"
-        maxWidth="2xl"
+        maxWidth="5xl"
       >
         <div className="space-y-4">
           <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
@@ -923,7 +1088,7 @@ export default function InventoryPage() {
               className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800"
             >
               <option value="All">All Items (Sab Parts)</option>
-              {parts.map((p) => (
+              {Array.from(new Map(parts.map((p) => [p.name.trim().toLowerCase(), p])).values()).map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
@@ -931,23 +1096,23 @@ export default function InventoryPage() {
             </select>
           </div>
 
-          <div className="max-h-96 overflow-y-auto border border-slate-200 rounded-xl">
+          <div className="max-h-[500px] overflow-y-auto overflow-x-auto border border-slate-200 rounded-xl">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-100 font-bold text-slate-600 sticky top-0">
+              <thead className="bg-slate-100 font-bold text-slate-700 sticky top-0 z-10">
                 <tr className="border-b border-slate-200">
-                  <th className="py-2.5 px-3">Date</th>
-                  <th className="py-2.5 px-3">Item Name</th>
-                  <th className="py-2.5 px-3">Supplier</th>
-                  <th className="py-2.5 px-3 text-right">Cost Price</th>
-                  <th className="py-2.5 px-3 text-center">Rate Change (Highlight)</th>
-                  <th className="py-2.5 px-3 text-right">Qty Purchased</th>
-                  <th className="py-2.5 px-3 text-right">Qty Remaining</th>
+                  <th className="py-3 px-3.5 whitespace-nowrap">Date</th>
+                  <th className="py-3 px-3.5 whitespace-nowrap">Item Name</th>
+                  <th className="py-3 px-3.5 whitespace-nowrap">Supplier</th>
+                  <th className="py-3 px-3.5 text-right whitespace-nowrap">Cost Price</th>
+                  <th className="py-3 px-4 text-center whitespace-nowrap min-w-[200px]">Rate Change (Highlight)</th>
+                  <th className="py-3 px-3.5 text-right whitespace-nowrap">Qty Purchased</th>
+                  <th className="py-3 px-3.5 text-right whitespace-nowrap">Qty Remaining</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {rateHistoryList.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-400">
+                    <td colSpan={7} className="py-10 text-center text-slate-400 font-medium">
                       Koi rate history record nahi mila.
                     </td>
                   </tr>
@@ -961,36 +1126,38 @@ export default function InventoryPage() {
                         key={entry.batchId}
                         className={hasChange ? (isIncrease ? "bg-amber-50/70" : "bg-emerald-50/70") : "hover:bg-slate-50"}
                       >
-                        <td className="py-2.5 px-3 font-semibold text-slate-700">
+                        <td className="py-3 px-3.5 font-semibold text-slate-700 whitespace-nowrap">
                           {formatDate(entry.purchaseDate)}
                         </td>
-                        <td className="py-2.5 px-3 font-extrabold text-slate-900">
+                        <td className="py-3 px-3.5 font-extrabold text-slate-900">
                           {entry.partName}
                         </td>
-                        <td className="py-2.5 px-3 text-slate-600">
+                        <td className="py-3 px-3.5 text-slate-600 whitespace-nowrap">
                           {entry.supplier}
                         </td>
-                        <td className="py-2.5 px-3 text-right font-black text-slate-900">
+                        <td className="py-3 px-3.5 text-right font-black text-slate-900 whitespace-nowrap">
                           {formatPKR(entry.costPrice)}
                         </td>
-                        <td className="py-2.5 px-3 text-center">
+                        <td className="py-3 px-4 text-center whitespace-nowrap">
                           {hasChange ? (
                             <Badge
                               variant={isIncrease ? "warning" : "success"}
-                              className="font-bold text-[10px] inline-flex items-center gap-1"
+                              className="font-bold text-xs px-2.5 py-1 inline-flex items-center gap-1.5 whitespace-nowrap shadow-xs"
                             >
-                              {isIncrease ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                              {entry.previousCostPrice} se {entry.costPrice} hua ({isIncrease ? "+" : ""}
-                              {entry.priceChange} Rs)
+                              {isIncrease ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+                              <span>
+                                {entry.previousCostPrice} se {entry.costPrice} hua ({isIncrease ? "+" : ""}
+                                {entry.priceChange} Rs)
+                              </span>
                             </Badge>
                           ) : (
-                            <span className="text-[10px] text-slate-400 font-medium">Same Rate</span>
+                            <span className="text-xs text-slate-400 font-medium">Same Rate</span>
                           )}
                         </td>
-                        <td className="py-2.5 px-3 text-right text-slate-700 font-bold">
+                        <td className="py-3 px-3.5 text-right text-slate-700 font-bold whitespace-nowrap">
                           {entry.qtyPurchased}
                         </td>
-                        <td className="py-2.5 px-3 text-right text-blue-700 font-black">
+                        <td className="py-3 px-3.5 text-right text-blue-700 font-black whitespace-nowrap">
                           {entry.qtyRemaining}
                         </td>
                       </tr>

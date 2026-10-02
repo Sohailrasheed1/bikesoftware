@@ -26,7 +26,7 @@ import {
   SEED_MECHANIC_LEDGER,
   SEED_JOB_CARDS,
 } from "../storage/seed-data";
-import { daysSince } from "../utils";
+import { daysSince, getLocalDateString } from "../utils";
 import { getDb, isMongoConfigured } from "./mongodb";
 
 export const DEFAULT_SHOP_ID = "shop-sikandar";
@@ -462,6 +462,7 @@ class MongoDBAtlasDatabase {
       costPrice: number;
       supplier: string;
       notes?: string;
+      newSellingPrice?: number;
     },
     shopId?: string
   ): Promise<PurchaseBatch> {
@@ -475,7 +476,7 @@ class MongoDBAtlasDatabase {
       id: `batch-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       partId: batchData.partId,
       partName,
-      purchaseDate: batchData.purchaseDate || new Date().toISOString(),
+      purchaseDate: batchData.purchaseDate || getLocalDateString(),
       qtyPurchased: Number(batchData.qtyPurchased) || 0,
       qtyRemaining: Number(batchData.qtyPurchased) || 0,
       costPrice: Number(batchData.costPrice) || 0,
@@ -494,17 +495,25 @@ class MongoDBAtlasDatabase {
     }
 
     // Rule 5: Item total stock = sum of qty_remaining of all batches for that item
-    await this.recalculatePartStock(batchData.partId, targetShop, batchData.costPrice);
+    await this.recalculatePartStock(batchData.partId, targetShop, batchData.costPrice, batchData.newSellingPrice);
     return newBatch;
   }
 
-  async recalculatePartStock(partId: string, shopId?: string, latestCostPrice?: number): Promise<Part | null> {
+  async recalculatePartStock(
+    partId: string,
+    shopId?: string,
+    latestCostPrice?: number,
+    newSellingPrice?: number
+  ): Promise<Part | null> {
     const targetShop = shopId || DEFAULT_SHOP_ID;
     const batches = await this.getPurchaseBatches(partId, targetShop);
     const totalRemaining = batches.reduce((sum, b) => sum + (b.qtyRemaining || 0), 0);
     const updates: Partial<Part> = { currentStock: totalRemaining };
     if (latestCostPrice !== undefined && latestCostPrice > 0) {
       updates.purchasePrice = latestCostPrice;
+    }
+    if (newSellingPrice !== undefined && newSellingPrice > 0) {
+      updates.sellingPrice = newSellingPrice;
     }
     return this.updatePart(partId, updates, targetShop);
   }
@@ -537,19 +546,29 @@ class MongoDBAtlasDatabase {
   // Rule 6: Rate history date wise per item with price change highlighting ("50 se 60 hua")
   async getPurchaseRateHistory(partId?: string, shopId?: string): Promise<RateHistoryEntry[]> {
     const targetShop = shopId || DEFAULT_SHOP_ID;
-    const batches = await this.getPurchaseBatches(partId, targetShop);
+    let targetPartName: string | undefined = undefined;
+    if (partId) {
+      const p = await this.getPart(partId, targetShop);
+      if (p) targetPartName = p.name.trim().toLowerCase();
+    }
 
-    // Group by partId
-    const groupedByPart: Record<string, PurchaseBatch[]> = {};
+    const batches = await this.getPurchaseBatches(undefined, targetShop);
+
+    // Group by normalized part name (so even if user accidentally created duplicate parts, rates compare correctly!)
+    const groupedByName: Record<string, PurchaseBatch[]> = {};
     for (const b of batches) {
-      if (!groupedByPart[b.partId]) groupedByPart[b.partId] = [];
-      groupedByPart[b.partId].push(b);
+      const normName = (b.partName || "Unknown").trim().toLowerCase();
+      if (partId && b.partId !== partId && normName !== targetPartName) {
+        continue;
+      }
+      if (!groupedByName[normName]) groupedByName[normName] = [];
+      groupedByName[normName].push(b);
     }
 
     const history: RateHistoryEntry[] = [];
 
-    for (const pId of Object.keys(groupedByPart)) {
-      const pBatches = groupedByPart[pId].sort(
+    for (const nameKey of Object.keys(groupedByName)) {
+      const pBatches = groupedByName[nameKey].sort(
         (a, b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime()
       );
 
@@ -799,6 +818,7 @@ class MongoDBAtlasDatabase {
         {
           partId: newPart.id,
           partName: newPart.name,
+          purchaseDate: getLocalDateString(),
           qtyPurchased: initialStock,
           costPrice: newPart.purchasePrice,
           supplier: newPart.supplierName || "Initial Stock Supplier",

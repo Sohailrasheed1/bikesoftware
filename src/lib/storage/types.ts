@@ -31,6 +31,7 @@ export interface IStorageService {
     costPrice: number;
     supplier: string;
     notes?: string;
+    newSellingPrice?: number;
   }): Promise<PurchaseBatch>;
   getPurchaseRateHistory(partId?: string): Promise<RateHistoryEntry[]>;
   recordPurchaseReturn(data: {

@@ -13,9 +13,25 @@ export function formatPKR(amount: number): string {
   }).format(amount).replace("PKR", "Rs.");
 }
 
+export function getLocalDateString(d: Date = new Date()): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function formatDate(dateString: string): string {
   if (!dateString) return "-";
   try {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      const [y, m, d] = dateString.split("-").map(Number);
+      const localDate = new Date(y, m - 1, d);
+      return new Intl.DateTimeFormat("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }).format(localDate);
+    }
     const d = new Date(dateString);
     return new Intl.DateTimeFormat("en-GB", {
       day: "2-digit",

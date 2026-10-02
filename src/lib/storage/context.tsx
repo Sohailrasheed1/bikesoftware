@@ -66,6 +66,7 @@ interface StoreContextType {
     costPrice: number;
     supplier: string;
     notes?: string;
+    newSellingPrice?: number;
   }) => Promise<PurchaseBatch>;
   getPurchaseRateHistory: (partId?: string) => Promise<RateHistoryEntry[]>;
   recordPurchaseReturn: (data: {
@@ -513,8 +514,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     costPrice: number;
     supplier: string;
     notes?: string;
+    newSellingPrice?: number;
   }) => {
-    // 1. Immediately update part stock and purchase price in React state (0ms latency!)
+    // 1. Immediately update part stock, purchase price, and selling price in React state (0ms latency!)
     setParts((prev) =>
       prev.map((p) =>
         p.id === batch.partId
@@ -522,6 +524,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
               ...p,
               currentStock: p.currentStock + (Number(batch.qtyPurchased) || 0),
               purchasePrice: Number(batch.costPrice) || p.purchasePrice,
+              sellingPrice:
+                Number(batch.newSellingPrice) > 0
+                  ? Number(batch.newSellingPrice)
+                  : p.sellingPrice,
               supplierName: batch.supplier || p.supplierName,
               updatedAt: new Date().toISOString(),
             }
