@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Printer, FileText, CheckCircle2, MessageCircle } from "lucide-react";
 import { formatPKR, formatDateTime } from "@/lib/utils";
 import { useLanguage } from "@/lib/i18n/context";
+import { getAssetUrl } from "@/lib/version";
 
 interface ReceiptModalProps {
   bill: Bill | null;
@@ -152,7 +153,7 @@ export function ReceiptModal({ bill, isOpen, onClose }: ReceiptModalProps) {
           <div className="text-center pb-4 border-b border-dashed border-slate-300">
             <div className="flex items-center justify-center gap-2 mb-1">
               <img
-                src="/icon-192.png"
+                src={getAssetUrl("/icon-192.png")}
                 alt="Jilani Autos"
                 className="h-8 w-8 rounded-lg object-contain"
               />

@@ -22,6 +22,7 @@ import { cn, formatPKR } from "@/lib/utils";
 import { useStore } from "@/lib/storage/context";
 import { useLanguage } from "@/lib/i18n/context";
 import { useSession, signOut } from "next-auth/react";
+import { getAssetUrl } from "@/lib/version";
 
 interface SidebarProps {
   onCloseMobile?: () => void;
@@ -104,7 +105,7 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
       {/* Brand Header */}
       <div className="p-5 border-b border-slate-200/80 flex items-center gap-3.5">
         <img
-          src="/icon-192.png"
+          src={getAssetUrl("/icon-192.png")}
           alt="Jilani Autos"
           className="h-11 w-11 rounded-2xl object-cover shadow-md shadow-blue-500/20 border border-slate-200/80 flex-shrink-0"
         />

@@ -12,17 +12,22 @@ interface LanguageContextType {
   dir: "rtl" | "ltr";
 }
 
-const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+export const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-const STORAGE_KEY = "jilani_autos_app_language_v1";
+export const APP_LANGUAGE_STORAGE_KEY = "jilani_autos_app_language_v1";
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguageState] = useState<Language>("roman");
+interface LanguageProviderProps {
+  children: React.ReactNode;
+  initialLanguage?: Language;
+}
+
+export function LanguageProvider({ children, initialLanguage = "roman" }: LanguageProviderProps) {
+  const [language, setLanguageState] = useState<Language>(initialLanguage);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY) as Language | null;
+      const saved = localStorage.getItem(APP_LANGUAGE_STORAGE_KEY) as Language | null;
       if (saved === "ur" || saved === "roman") {
         setLanguageState(saved);
       }
@@ -30,12 +35,24 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       // LocalStorage not available
     }
     setMounted(true);
+
+    // Cross-tab synchronization: keep language state in sync across multiple browser tabs
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === APP_LANGUAGE_STORAGE_KEY && (e.newValue === "ur" || e.newValue === "roman")) {
+        setLanguageState(e.newValue as Language);
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
 
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
     try {
-      localStorage.setItem(STORAGE_KEY, lang);
+      localStorage.setItem(APP_LANGUAGE_STORAGE_KEY, lang);
+      // Also persist to cookie for server-side layout and initial paint alignment
+      document.cookie = `${APP_LANGUAGE_STORAGE_KEY}=${lang}; path=/; max-age=31536000; SameSite=Lax`;
     } catch {
       // ignore
     }
@@ -48,9 +65,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
   const isUrdu = language === "ur";
   const dir = isUrdu ? "rtl" : "ltr";
-  const t = translations[language];
+  const t = translations[language] || translations.roman;
 
-  // Update HTML dir and lang attributes dynamically
+  // Update HTML dir and lang attributes dynamically without stale layout classes
   useEffect(() => {
     if (typeof document !== "undefined") {
       document.documentElement.lang = isUrdu ? "ur" : "ur-Latn";

@@ -26,7 +26,9 @@ export async function middleware(req: NextRequest) {
     pathname.endsWith(".webp") ||
     pathname === "/manifest.json" ||
     pathname === "/sw.js" ||
-    pathname === "/robots.txt";
+    pathname === "/offline.html" ||
+    pathname === "/robots.txt" ||
+    pathname === "/api/app-version";
 
   // Ignore browser extensions probing /api/ext
   if (pathname.startsWith("/api/ext")) {

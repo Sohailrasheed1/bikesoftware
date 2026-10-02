@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>آف لائن موڈ — جیلانی آٹوز</title>
+  <link rel="icon" href="/icon-192.png">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+    body {
+      background-color: #f8fafc;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+      text-align: center;
+    }
+    .card {
+      background: white;
+      border-radius: 20px;
+      padding: 32px 24px;
+      max-width: 440px;
+      width: 100%;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+      border: 1px solid #e2e8f0;
+    }
+    .logo {
+      width: 80px;
+      height: 80px;
+      border-radius: 16px;
+      object-fit: cover;
+      margin-bottom: 20px;
+      border: 2px solid #e2e8f0;
+    }
+    .badge {
+      display: inline-block;
+      background: #fef2f2;
+      color: #dc2626;
+      border: 1px solid #fecaca;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+    h1 {
+      font-size: 20px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 8px;
+    }
+    p {
+      font-size: 14px;
+      color: #64748b;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .btn {
+      display: inline-block;
+      width: 100%;
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .btn:hover {
+      background: #1d4ed8;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <img src="/icon-192.png" alt="Jilani Autos Logo" class="logo">
+    <div>
+      <span class="badge">انٹرنیٹ منقطع ہے (Offline)</span>
+    </div>
+    <h1>جیلانی آٹوز — سافٹ ویئر</h1>
+    <p>
+      آپ کا انٹرنیٹ کنکشن منقطع ہے۔ براہ کرم اپنا وائی فائی یا موبائل ڈیٹا چیک کریں۔ انٹرنیٹ بحال ہوتے ہی ریفریش بٹن دبائیں۔
+    </p>
+    <button class="btn" onclick="window.location.reload()">
+      دوبارہ کوشش کریں (Retry)
+    </button>
+  </div>
+</body>
+</html>

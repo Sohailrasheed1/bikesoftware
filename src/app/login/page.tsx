@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/lib/i18n/context";
 import { useToast } from "@/components/providers/toast-provider";
 import { cn } from "@/lib/utils";
+import { getAssetUrl } from "@/lib/version";
 
 function LoginForm() {
   const router = useRouter();
@@ -287,7 +288,7 @@ function LoginForm() {
       <div className="text-center space-y-2 pb-1">
         <div className="inline-flex h-16 w-16 sm:h-20 sm:w-20 rounded-2xl overflow-hidden shadow-xl shadow-blue-500/25 border-2 border-white/90 p-0.5 bg-gradient-to-tr from-blue-700 to-indigo-900">
           <img
-            src="/icon-192.png"
+            src={getAssetUrl("/icon-192.png")}
             alt="Jilani Autos Logo"
             className="h-full w-full object-cover rounded-[14px]"
           />

@@ -1,10 +1,13 @@
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import "./globals.css";
 import { StoreProvider } from "@/lib/storage/context";
 import { AuthProvider } from "@/components/providers/auth-provider";
-import { LanguageProvider } from "@/lib/i18n/context";
+import { LanguageProvider, APP_LANGUAGE_STORAGE_KEY } from "@/lib/i18n/context";
 import { ToastProvider } from "@/components/providers/toast-provider";
 import { Shell } from "@/components/layout/shell";
+import { ServiceWorkerRegister } from "@/components/providers/service-worker-register";
+import { getAssetUrl } from "@/lib/version";
 
 export const viewport: Viewport = {
   themeColor: "#2563eb",
@@ -19,7 +22,7 @@ export const metadata: Metadata = {
   title: "Jilani Autos — Complete Shop Management System",
   description:
     "Professional motorcycle spare parts shop management software for Jilani Autos, Karachi. Bilingual: Roman Urdu & Proper Urdu with Inventory, Workshop, POS Billing, Customers, and Reports.",
-  manifest: "/manifest.json",
+  manifest: getAssetUrl("/manifest.json"),
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -33,30 +36,39 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
-      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: getAssetUrl("/icon-192.png"), sizes: "192x192", type: "image/png" },
+      { url: getAssetUrl("/icon-512.png"), sizes: "512x512", type: "image/png" },
+      { url: getAssetUrl("/icon.svg"), type: "image/svg+xml" },
     ],
     apple: [
-      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+      { url: getAssetUrl("/apple-touch-icon.png"), sizes: "180x180", type: "image/png" },
     ],
-    shortcut: "/icon-192.png",
+    shortcut: getAssetUrl("/icon-192.png"),
   },
 };
-
-import { ServiceWorkerRegister } from "@/components/providers/service-worker-register";
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = cookies();
+  const savedLang = cookieStore.get(APP_LANGUAGE_STORAGE_KEY)?.value;
+  const isUrdu = savedLang === "ur";
+
   return (
-    <html lang="ur-Latn">
-      <body className="antialiased font-sans text-slate-900 bg-slate-50 selection:bg-blue-100 selection:text-blue-900">
-        <ServiceWorkerRegister />
+    <html lang={isUrdu ? "ur" : "ur-Latn"} dir={isUrdu ? "rtl" : "ltr"}>
+      <head>
+        <link rel="manifest" href={getAssetUrl("/manifest.json")} />
+      </head>
+      <body
+        className={`antialiased font-sans text-slate-900 bg-slate-50 selection:bg-blue-100 selection:text-blue-900 ${
+          isUrdu ? "font-urdu" : ""
+        }`}
+      >
         <AuthProvider>
-          <LanguageProvider>
+          <LanguageProvider initialLanguage={isUrdu ? "ur" : "roman"}>
+            <ServiceWorkerRegister />
             <ToastProvider>
               <StoreProvider>
                 <Shell>{children}</Shell>
