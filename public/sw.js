@@ -1,4 +1,4 @@
-const CACHE_NAME = "jilani-autos-pwa-v1";
+const CACHE_NAME = "jilani-autos-pwa-v2";
 
 const STATIC_ASSETS = [
   "/",
@@ -12,7 +12,11 @@ const STATIC_ASSETS = [
   "/suppliers",
   "/workshop",
   "/manifest.json",
-  "/icon.svg"
+  "/icon.svg",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/apple-touch-icon.png",
+  "/icon.png"
 ];
 
 // Install Event - Pre-cache essential static assets

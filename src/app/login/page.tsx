@@ -38,7 +38,9 @@ function LoginForm() {
     const hasOfflineSession =
       typeof window !== "undefined" &&
       (localStorage.getItem("jilani_autos_logged_in") === "true" ||
-        !!localStorage.getItem("jilani_autos_offline_session"));
+        localStorage.getItem("gilani_autos_logged_in") === "true" ||
+        !!localStorage.getItem("jilani_autos_offline_session") ||
+        !!localStorage.getItem("gilani_autos_offline_session"));
 
     if (status === "authenticated" || hasOfflineSession) {
       let isSuper = false;
@@ -46,7 +48,11 @@ function LoginForm() {
         isSuper = (session.user as any)?.role === "superadmin";
       } else if (typeof window !== "undefined") {
         try {
-          const offUser = JSON.parse(localStorage.getItem("jilani_autos_offline_session") || "{}");
+          const offUser = JSON.parse(
+            localStorage.getItem("jilani_autos_offline_session") ||
+            localStorage.getItem("gilani_autos_offline_session") ||
+            "{}"
+          );
           isSuper = offUser.role === "superadmin";
         } catch {}
       }
@@ -279,8 +285,12 @@ function LoginForm() {
 
       {/* Brand Header */}
       <div className="text-center space-y-2 pb-1">
-        <div className="inline-flex h-13 w-13 sm:h-14 sm:w-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 items-center justify-center text-white shadow-lg shadow-blue-500/25">
-          <Wrench className="h-6 w-6 sm:h-7 sm:w-7" />
+        <div className="inline-flex h-16 w-16 sm:h-20 sm:w-20 rounded-2xl overflow-hidden shadow-xl shadow-blue-500/25 border-2 border-white/90 p-0.5 bg-gradient-to-tr from-blue-700 to-indigo-900">
+          <img
+            src="/icon-192.png"
+            alt="Jilani Autos Logo"
+            className="h-full w-full object-cover rounded-[14px]"
+          />
         </div>
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">

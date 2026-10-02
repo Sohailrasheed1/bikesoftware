@@ -150,8 +150,15 @@ export function ReceiptModal({ bill, isOpen, onClose }: ReceiptModalProps) {
         >
           {/* Header */}
           <div className="text-center pb-4 border-b border-dashed border-slate-300">
-            <div className="text-lg font-black tracking-tight text-slate-900">
-              {t.appName}
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <img
+                src="/icon-192.png"
+                alt="Jilani Autos"
+                className="h-8 w-8 rounded-lg object-contain"
+              />
+              <div className="text-lg font-black tracking-tight text-slate-900">
+                {t.appName}
+              </div>
             </div>
             <div className="text-[11px] text-slate-600 font-medium mt-0.5">
               {isUrdu

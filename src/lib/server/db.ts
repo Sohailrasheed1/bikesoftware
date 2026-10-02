@@ -719,6 +719,20 @@ class MongoDBAtlasDatabase {
   }
 
   // --- PARTS / INVENTORY ---
+  private normalizePartRecord(part: any): Part {
+    if (!part) return part;
+    let models: string[] = [];
+    if (Array.isArray(part.compatibleModels)) {
+      models = part.compatibleModels.filter(Boolean);
+    } else if (typeof part.compatibleModels === "string") {
+      models = part.compatibleModels.split(",").map((m: string) => m.trim()).filter(Boolean);
+    }
+    return {
+      ...part,
+      compatibleModels: models,
+    };
+  }
+
   async getParts(shopId?: string): Promise<Part[]> {
     const targetShop = shopId || DEFAULT_SHOP_ID;
     if (isMongoConfigured()) {
@@ -726,12 +740,14 @@ class MongoDBAtlasDatabase {
         const db = await getDb();
         const filter = getShopFilter(targetShop);
         const parts = await db.collection<Part>("parts").find(filter).sort({ createdAt: -1 }).toArray();
-        return parts.map(({ _id, ...rest }: any) => rest as Part);
+        return parts.map(({ _id, ...rest }: any) => this.normalizePartRecord(rest as Part));
       } catch (err) {
         console.error("MongoDB getParts error (falling back to memoryStore):", err);
       }
     }
-    return memoryStore.parts.filter((p) => matchesShop(p.shopId, targetShop));
+    return memoryStore.parts
+      .filter((p) => matchesShop(p.shopId, targetShop))
+      .map((p) => this.normalizePartRecord(p));
   }
 
   async getPart(id: string, shopId?: string): Promise<Part | null> {
@@ -743,13 +759,14 @@ class MongoDBAtlasDatabase {
         const part = await db.collection<Part>("parts").findOne(filter);
         if (part) {
           const { _id, ...rest } = part as any;
-          return rest as Part;
+          return this.normalizePartRecord(rest as Part);
         }
       } catch (err) {
         console.error("MongoDB getPart error (falling back to memoryStore):", err);
       }
     }
-    return memoryStore.parts.find((p) => p.id === id && matchesShop(p.shopId, targetShop)) || null;
+    const found = memoryStore.parts.find((p) => p.id === id && matchesShop(p.shopId, targetShop));
+    return found ? this.normalizePartRecord(found) : null;
   }
 
   async createPart(
@@ -758,9 +775,10 @@ class MongoDBAtlasDatabase {
   ): Promise<Part> {
     const targetShop = shopId || DEFAULT_SHOP_ID;
     const initialStock = Number(partData.currentStock) || 0;
+    const normalizedData = this.normalizePartRecord(partData);
 
     const newPart: Part = {
-      ...partData,
+      ...normalizedData,
       id: `part-${Date.now()}`,
       currentStock: initialStock,
       shopId: targetShop,
@@ -1018,7 +1036,7 @@ class MongoDBAtlasDatabase {
 
         const deduct = Math.min(batch.qtyRemaining, remainingToDeduct);
         const costPrice = batch.costPrice;
-        const salePrice = item.unitPrice;
+        const salePrice = item.unitPrice ?? (item as any).sellingPrice ?? (item as any).price ?? 0;
         const profit = (salePrice - costPrice) * deduct;
 
         // Update batch remaining qty locally

@@ -72,10 +72,12 @@ export function Navbar() {
         {/* 1. Left: Concise Brand or Back to Dashboard */}
         <div className="flex items-center gap-2 flex-shrink-0 min-w-0">
           {isHome ? (
-            <Link href="/" className="flex items-center gap-2 flex-shrink-0 group">
-              <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-xs shadow-xs flex-shrink-0 group-hover:scale-105 transition-transform">
-                🏍️
-              </div>
+            <Link href="/" className="flex items-center gap-2.5 flex-shrink-0 group">
+              <img
+                src="/icon-192.png"
+                alt="Jilani Autos"
+                className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl object-cover shadow-xs flex-shrink-0 group-hover:scale-105 transition-transform border border-slate-200/80"
+              />
               <div className="text-xs sm:text-sm font-black text-slate-900 tracking-tight whitespace-nowrap">
                 {shopDisplayName}
               </div>
@@ -181,6 +183,8 @@ export function Navbar() {
               if (typeof window !== "undefined") {
                 localStorage.removeItem("jilani_autos_offline_session");
                 localStorage.removeItem("jilani_autos_logged_in");
+                localStorage.removeItem("gilani_autos_offline_session");
+                localStorage.removeItem("gilani_autos_logged_in");
               }
               await signOut({ callbackUrl: "/login" });
             }}

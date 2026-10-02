@@ -249,8 +249,8 @@ export type UserRole = "superadmin" | "admin" | "staff";
 export interface Shop {
   id: string; // e.g. "shop-sikandar", "shop-1712345678"
   slug: string;
-  name: string; // e.g. "Sikander Spare Parts"
-  urduName?: string; // e.g. "سکندر اسپیئر پارٹس"
+  name: string; // e.g. "Jilani Autos"
+  urduName?: string; // e.g. "جیلانی آٹوز"
   ownerName: string;
   phone: string;
   address: string;

@@ -32,7 +32,7 @@ import { ReceiptModal } from "@/components/pos/receipt-modal";
 import { useStore } from "@/lib/storage/context";
 import { useLanguage } from "@/lib/i18n/context";
 import { Part, Customer, Bill, BillItem, BillLabourItem } from "@/types";
-import { formatPKR } from "@/lib/utils";
+import { formatPKR, formatCompatibleModels, toModelArray } from "@/lib/utils";
 
 export default function BillingPage() {
   const { parts, customers, mechanics, createBill, addCustomer } = useStore();
@@ -274,7 +274,7 @@ export default function BillingPage() {
     const matchesSearch =
       part.name.toLowerCase().includes(s) ||
       part.category.toLowerCase().includes(s) ||
-      part.compatibleModels.some((m) => m.toLowerCase().includes(s)) ||
+      toModelArray(part.compatibleModels).some((m) => m.toLowerCase().includes(s)) ||
       (part.sku && part.sku.toLowerCase().includes(s));
 
     const matchesCategory =
@@ -597,7 +597,7 @@ export default function BillingPage() {
 
                       <div className="flex items-center gap-2 text-[11px] text-slate-500 flex-wrap">
                         <span className="text-blue-700 font-semibold">
-                          {part.compatibleModels.slice(0, 2).join(", ")}
+                          {formatCompatibleModels(toModelArray(part.compatibleModels).slice(0, 2))}
                         </span>
                         <span>•</span>
                         {isOutOfStock ? (

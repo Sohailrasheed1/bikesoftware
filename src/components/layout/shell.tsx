@@ -30,7 +30,19 @@ export function Shell({ children }: { children: React.ReactNode }) {
     const hasOfflineSession =
       typeof window !== "undefined" &&
       (localStorage.getItem("jilani_autos_logged_in") === "true" ||
-        !!localStorage.getItem("jilani_autos_offline_session"));
+        localStorage.getItem("gilani_autos_logged_in") === "true" ||
+        !!localStorage.getItem("jilani_autos_offline_session") ||
+        !!localStorage.getItem("gilani_autos_offline_session"));
+
+    if (hasOfflineSession && typeof window !== "undefined") {
+      // Auto-migrate legacy storage keys
+      if (!localStorage.getItem("jilani_autos_logged_in") && localStorage.getItem("gilani_autos_logged_in")) {
+        localStorage.setItem("jilani_autos_logged_in", "true");
+      }
+      if (!localStorage.getItem("jilani_autos_offline_session") && localStorage.getItem("gilani_autos_offline_session")) {
+        localStorage.setItem("jilani_autos_offline_session", localStorage.getItem("gilani_autos_offline_session")!);
+      }
+    }
 
     if (!isLoginPage && status === "unauthenticated" && !hasOfflineSession) {
       const redirectUrl =

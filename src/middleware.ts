@@ -15,9 +15,17 @@ export async function middleware(req: NextRequest) {
   const isPublicAsset =
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/auth") ||
-    pathname === "/favicon.ico" ||
-    pathname === "/icon.svg" ||
+    pathname.startsWith("/icon") ||
+    pathname.startsWith("/apple-touch-icon") ||
+    pathname.startsWith("/favicon") ||
+    pathname.endsWith(".png") ||
+    pathname.endsWith(".jpg") ||
+    pathname.endsWith(".jpeg") ||
+    pathname.endsWith(".svg") ||
+    pathname.endsWith(".ico") ||
+    pathname.endsWith(".webp") ||
     pathname === "/manifest.json" ||
+    pathname === "/sw.js" ||
     pathname === "/robots.txt";
 
   // Ignore browser extensions probing /api/ext

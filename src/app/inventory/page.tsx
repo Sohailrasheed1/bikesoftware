@@ -36,7 +36,7 @@ import { Modal } from "@/components/ui/modal";
 import { useStore } from "@/lib/storage/context";
 import { useLanguage } from "@/lib/i18n/context";
 import { Part, PartCategory, PurchaseBatch, RateHistoryEntry } from "@/types";
-import { formatPKR, formatDate } from "@/lib/utils";
+import { formatPKR, formatDate, formatCompatibleModels, toModelArray } from "@/lib/utils";
 
 const CATEGORIES: { label: string; value: PartCategory }[] = [
   { label: "Engine & Transmission", value: "Engine & Transmission" },
@@ -144,7 +144,7 @@ export default function InventoryPage() {
       name: part.name,
       category: part.category,
       sku: part.sku || "",
-      compatibleModels: part.compatibleModels.join(", "),
+      compatibleModels: formatCompatibleModels(part.compatibleModels),
       purchasePrice: part.purchasePrice,
       sellingPrice: part.sellingPrice,
       currentStock: part.currentStock,
@@ -287,7 +287,7 @@ export default function InventoryPage() {
       part.category.toLowerCase().includes(s) ||
       (part.sku && part.sku.toLowerCase().includes(s)) ||
       part.supplierName.toLowerCase().includes(s) ||
-      part.compatibleModels.some((m) => m.toLowerCase().includes(s));
+      toModelArray(part.compatibleModels).some((m) => m.toLowerCase().includes(s));
 
     const matchesCategory =
       selectedCategory === "All" || part.category === selectedCategory;
@@ -549,7 +549,7 @@ export default function InventoryPage() {
                           {part.name}
                         </div>
                         <div className="text-[11px] text-blue-700 font-semibold mt-0.5">
-                          {part.compatibleModels.join(", ")}
+                          {formatCompatibleModels(part.compatibleModels)}
                         </div>
                       </td>
 

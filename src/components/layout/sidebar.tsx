@@ -103,9 +103,11 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
     <aside className="w-72 flex-shrink-0 flex flex-col h-full glass-sidebar border-r border-slate-200/80 bg-white">
       {/* Brand Header */}
       <div className="p-5 border-b border-slate-200/80 flex items-center gap-3.5">
-        <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
-          <Wrench className="h-6 w-6 stroke-[2.2]" />
-        </div>
+        <img
+          src="/icon-192.png"
+          alt="Jilani Autos"
+          className="h-11 w-11 rounded-2xl object-cover shadow-md shadow-blue-500/20 border border-slate-200/80 flex-shrink-0"
+        />
         <div>
           <h1 className="font-extrabold text-base tracking-tight text-slate-900 leading-tight">
             {(session?.user as any)?.shopName || t.appName}
@@ -221,6 +223,8 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
               if (typeof window !== "undefined") {
                 localStorage.removeItem("jilani_autos_offline_session");
                 localStorage.removeItem("jilani_autos_logged_in");
+                localStorage.removeItem("gilani_autos_offline_session");
+                localStorage.removeItem("gilani_autos_logged_in");
               }
               await signOut({ callbackUrl: "/login" });
             }}

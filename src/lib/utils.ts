@@ -51,3 +51,21 @@ export function daysSince(dateString: string): number {
   const diffTime = Math.max(0, now - d);
   return Math.floor(diffTime / (1000 * 60 * 60 * 24));
 }
+
+export function formatCompatibleModels(models: string[] | string | undefined | null): string {
+  if (!models) return "";
+  if (Array.isArray(models)) return models.join(", ");
+  return String(models);
+}
+
+export function toModelArray(models: string[] | string | undefined | null): string[] {
+  if (!models) return [];
+  if (Array.isArray(models)) return models;
+  if (typeof models === "string") {
+    return models
+      .split(",")
+      .map((m) => m.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
