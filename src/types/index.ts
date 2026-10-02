@@ -69,14 +69,74 @@ export interface BillLabourItem {
   mechanicShare: number;     // e.g. 700
 }
 
+export interface PurchaseBatch {
+  id: string;            // batch_id
+  partId: string;        // item_id
+  partName: string;      // item_name
+  purchaseDate: string;  // ISO date string
+  qtyPurchased: number;  // Initial purchase quantity
+  qtyRemaining: number;  // Available stock in this batch
+  costPrice: number;     // Purchase cost price per unit
+  supplier: string;      // Supplier name
+  notes?: string;
+  shopId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaleDetail {
+  id: string;
+  billId: string;
+  billNumber: string;
+  partId: string;
+  partName: string;
+  batchId: string;
+  quantity: number;
+  costPrice: number;     // Batch cost price
+  salePrice: number;     // Selling price to customer
+  profit: number;        // (salePrice - costPrice) * quantity
+  shopId?: string;
+  createdAt: string;
+}
+
+export interface StockAdjustment {
+  id: string;
+  type: "purchase_return" | "adjustment";
+  partId: string;
+  partName: string;
+  batchId?: string;
+  quantity: number;
+  reason: string;
+  supplier?: string;
+  costPrice?: number;
+  shopId?: string;
+  createdAt: string;
+}
+
+export interface RateHistoryEntry {
+  batchId: string;
+  partId: string;
+  partName: string;
+  purchaseDate: string;
+  supplier: string;
+  costPrice: number;
+  previousCostPrice?: number;
+  priceChange?: number;          // e.g. +10 or -5
+  priceChangePercentage?: number; // e.g. +20%
+  qtyPurchased: number;
+  qtyRemaining: number;
+}
+
 export interface BillItem {
   partId: string;
   partName: string;
   category: string;
   quantity: number;
   unitPrice: number;
-  purchasePrice: number; // For profit calculation in reports
+  purchasePrice: number; // Weighted / latest batch cost for display
   totalPrice: number;
+  batchDeductions?: SaleDetail[]; // FIFO batch breakdown records
+  itemProfit?: number; // Total profit for this item computed from FIFO batch costs
 }
 
 export interface Bill {

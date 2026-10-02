@@ -8,16 +8,45 @@ import {
   MechanicLedgerEntry,
   VehicleJobCard,
   BillLabourItem,
+  PurchaseBatch,
+  SaleDetail,
+  StockAdjustment,
+  RateHistoryEntry,
 } from "@/types";
 
 export interface IStorageService {
-  // Inventory
+  // Inventory & FIFO Costing Model
   getParts(): Promise<Part[]>;
   getPart(id: string): Promise<Part | null>;
   createPart(part: Omit<Part, "id" | "createdAt" | "updatedAt">): Promise<Part>;
   updatePart(id: string, updates: Partial<Part>): Promise<Part>;
   deletePart(id: string): Promise<boolean>;
   updateStock(id: string, delta: number): Promise<Part>;
+  getPurchaseBatches(partId?: string): Promise<PurchaseBatch[]>;
+  createPurchaseBatch(batch: {
+    partId: string;
+    partName?: string;
+    purchaseDate?: string;
+    qtyPurchased: number;
+    costPrice: number;
+    supplier: string;
+    notes?: string;
+  }): Promise<PurchaseBatch>;
+  getPurchaseRateHistory(partId?: string): Promise<RateHistoryEntry[]>;
+  recordPurchaseReturn(data: {
+    partId: string;
+    batchId?: string;
+    quantity: number;
+    reason: string;
+    supplier?: string;
+  }): Promise<StockAdjustment>;
+  recordStockAdjustment(data: {
+    partId: string;
+    batchId?: string;
+    quantity: number;
+    reason: string;
+  }): Promise<StockAdjustment>;
+  getSaleDetails(billId?: string, partId?: string): Promise<SaleDetail[]>;
 
   // Customers
   getCustomers(): Promise<Customer[]>;

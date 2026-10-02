@@ -32,7 +32,7 @@ export function Navbar() {
 
   const userRole = (session?.user as any)?.role;
   const isSuperAdmin = userRole === "superadmin";
-  const shopDisplayName = (session?.user as any)?.shopName || "Gilani Autos";
+  const shopDisplayName = (session?.user as any)?.shopName || "Jilani Autos";
 
   useEffect(() => {
     const updateTime = () => {
@@ -179,8 +179,8 @@ export function Navbar() {
           <button
             onClick={async () => {
               if (typeof window !== "undefined") {
-                localStorage.removeItem("gilani_autos_offline_session");
-                localStorage.removeItem("gilani_autos_logged_in");
+                localStorage.removeItem("jilani_autos_offline_session");
+                localStorage.removeItem("jilani_autos_logged_in");
               }
               await signOut({ callbackUrl: "/login" });
             }}

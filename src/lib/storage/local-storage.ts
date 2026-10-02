@@ -8,6 +8,10 @@ import {
   MechanicLedgerEntry,
   VehicleJobCard,
   BillLabourItem,
+  PurchaseBatch,
+  SaleDetail,
+  StockAdjustment,
+  RateHistoryEntry,
 } from "@/types";
 import { IStorageService } from "./types";
 import {
@@ -22,13 +26,16 @@ import {
 import { daysSince } from "../utils";
 
 const STORAGE_KEYS = {
-  PARTS: "gilani_autos_parts_v1",
-  CUSTOMERS: "gilani_autos_customers_v1",
-  BILLS: "gilani_autos_bills_v1",
-  SUPPLIER_CREDITS: "gilani_autos_supplier_credits_v1",
-  MECHANICS: "gilani_autos_mechanics_v1",
-  MECHANIC_LEDGER: "gilani_autos_mechanic_ledger_v1",
-  JOB_CARDS: "gilani_autos_job_cards_v1",
+  PARTS: "jilani_autos_parts_v1",
+  CUSTOMERS: "jilani_autos_customers_v1",
+  BILLS: "jilani_autos_bills_v1",
+  SUPPLIER_CREDITS: "jilani_autos_supplier_credits_v1",
+  MECHANICS: "jilani_autos_mechanics_v1",
+  MECHANIC_LEDGER: "jilani_autos_mechanic_ledger_v1",
+  JOB_CARDS: "jilani_autos_job_cards_v1",
+  PURCHASE_BATCHES: "jilani_autos_purchase_batches_v1",
+  SALE_DETAILS: "jilani_autos_sale_details_v1",
+  STOCK_ADJUSTMENTS: "jilani_autos_stock_adjustments_v1",
 };
 
 export class LocalStorageService implements IStorageService {
@@ -109,11 +116,227 @@ export class LocalStorageService implements IStorageService {
     const part = parts.find((p) => p.id === id);
     if (!part) throw new Error("Part not found");
 
-    const newStock = Math.max(0, part.currentStock + delta);
-    part.currentStock = newStock;
-    part.updatedAt = new Date().toISOString();
-    this.setItem(STORAGE_KEYS.PARTS, parts);
-    return part;
+    if (delta > 0) {
+      await this.createPurchaseBatch({
+        partId: id,
+        partName: part.name,
+        qtyPurchased: delta,
+        costPrice: part.purchasePrice,
+        supplier: part.supplierName || "Direct Stock Add",
+        notes: "Stock addition batch",
+      });
+    } else if (delta < 0) {
+      await this.recordPurchaseReturn({
+        partId: id,
+        quantity: Math.abs(delta),
+        reason: "Direct stock reduction",
+      });
+    }
+
+    const updated = await this.getPart(id);
+    return updated || part;
+  }
+
+  // --- FIFO BATCHES & COSTING ---
+  async getPurchaseBatches(partId?: string): Promise<PurchaseBatch[]> {
+    const batches = this.getItem<PurchaseBatch[]>(STORAGE_KEYS.PURCHASE_BATCHES, []);
+    let list = partId ? batches.filter((b) => b.partId === partId) : batches;
+    return list.sort((a, b) => (a.purchaseDate > b.purchaseDate ? 1 : -1));
+  }
+
+  async createPurchaseBatch(batchData: {
+    partId: string;
+    partName?: string;
+    purchaseDate?: string;
+    qtyPurchased: number;
+    costPrice: number;
+    supplier: string;
+    notes?: string;
+  }): Promise<PurchaseBatch> {
+    const batches = await this.getPurchaseBatches();
+    const part = await this.getPart(batchData.partId);
+    const partName = batchData.partName || part?.name || "Spare Part";
+
+    const newBatch: PurchaseBatch = {
+      id: `batch-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      partId: batchData.partId,
+      partName,
+      purchaseDate: batchData.purchaseDate || new Date().toISOString(),
+      qtyPurchased: Number(batchData.qtyPurchased) || 0,
+      qtyRemaining: Number(batchData.qtyPurchased) || 0,
+      costPrice: Number(batchData.costPrice) || 0,
+      supplier: batchData.supplier || "General Supplier",
+      notes: batchData.notes,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    batches.push(newBatch);
+    this.setItem(STORAGE_KEYS.PURCHASE_BATCHES, batches);
+
+    // Update Part stock = sum of all batch remaining stock for this part
+    const partBatches = batches.filter((b) => b.partId === batchData.partId);
+    const totalRemaining = partBatches.reduce((sum, b) => sum + b.qtyRemaining, 0);
+    if (part) {
+      await this.updatePart(batchData.partId, {
+        currentStock: totalRemaining,
+        purchasePrice: batchData.costPrice > 0 ? batchData.costPrice : part.purchasePrice,
+      });
+    }
+
+    return newBatch;
+  }
+
+  async getPurchaseRateHistory(partId?: string): Promise<RateHistoryEntry[]> {
+    const batches = await this.getPurchaseBatches(partId);
+    const grouped: Record<string, PurchaseBatch[]> = {};
+    for (const b of batches) {
+      if (!grouped[b.partId]) grouped[b.partId] = [];
+      grouped[b.partId].push(b);
+    }
+
+    const history: RateHistoryEntry[] = [];
+    for (const pId of Object.keys(grouped)) {
+      const pBatches = grouped[pId].sort(
+        (a, b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime()
+      );
+      let prevCost: number | undefined = undefined;
+
+      for (const batch of pBatches) {
+        const priceChange = prevCost !== undefined ? batch.costPrice - prevCost : undefined;
+        const priceChangePercentage =
+          prevCost !== undefined && prevCost > 0
+            ? Math.round(((batch.costPrice - prevCost) / prevCost) * 100)
+            : undefined;
+
+        history.push({
+          batchId: batch.id,
+          partId: batch.partId,
+          partName: batch.partName,
+          purchaseDate: batch.purchaseDate,
+          supplier: batch.supplier,
+          costPrice: batch.costPrice,
+          previousCostPrice: prevCost,
+          priceChange,
+          priceChangePercentage,
+          qtyPurchased: batch.qtyPurchased,
+          qtyRemaining: batch.qtyRemaining,
+        });
+        prevCost = batch.costPrice;
+      }
+    }
+    return history.sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
+  }
+
+  async recordPurchaseReturn(data: {
+    partId: string;
+    batchId?: string;
+    quantity: number;
+    reason: string;
+    supplier?: string;
+  }): Promise<StockAdjustment> {
+    const batches = await this.getPurchaseBatches();
+    const part = await this.getPart(data.partId);
+    if (!part) throw new Error("Part not found");
+    if (data.quantity <= 0) throw new Error("Return quantity must be greater than 0");
+
+    let qtyToDeduct = data.quantity;
+    if (data.batchId) {
+      const b = batches.find((x) => x.id === data.batchId);
+      if (!b) throw new Error("Specified batch not found");
+      if (b.qtyRemaining < qtyToDeduct) throw new Error("Insufficient batch quantity for return");
+      b.qtyRemaining -= qtyToDeduct;
+      b.updatedAt = new Date().toISOString();
+    } else {
+      const activeBatches = batches.filter((b) => b.partId === data.partId && b.qtyRemaining > 0);
+      const totalAvail = activeBatches.reduce((s, b) => s + b.qtyRemaining, 0);
+      if (totalAvail < qtyToDeduct) throw new Error("Insufficient stock for purchase return");
+
+      for (const b of activeBatches) {
+        if (qtyToDeduct <= 0) break;
+        const take = Math.min(b.qtyRemaining, qtyToDeduct);
+        b.qtyRemaining -= take;
+        b.updatedAt = new Date().toISOString();
+        qtyToDeduct -= take;
+      }
+    }
+
+    this.setItem(STORAGE_KEYS.PURCHASE_BATCHES, batches);
+
+    const adjustments = this.getItem<StockAdjustment[]>(STORAGE_KEYS.STOCK_ADJUSTMENTS, []);
+    const adj: StockAdjustment = {
+      id: `adj-${Date.now()}`,
+      type: "purchase_return",
+      partId: data.partId,
+      partName: part.name,
+      batchId: data.batchId,
+      quantity: data.quantity,
+      reason: data.reason || "Purchase Return",
+      supplier: data.supplier || part.supplierName,
+      costPrice: part.purchasePrice,
+      createdAt: new Date().toISOString(),
+    };
+    adjustments.unshift(adj);
+    this.setItem(STORAGE_KEYS.STOCK_ADJUSTMENTS, adjustments);
+
+    // Update part currentStock
+    const partBatches = batches.filter((b) => b.partId === data.partId);
+    const newStock = partBatches.reduce((s, b) => s + b.qtyRemaining, 0);
+    await this.updatePart(data.partId, { currentStock: newStock });
+
+    return adj;
+  }
+
+  async recordStockAdjustment(data: {
+    partId: string;
+    batchId?: string;
+    quantity: number;
+    reason: string;
+  }): Promise<StockAdjustment> {
+    const part = await this.getPart(data.partId);
+    if (!part) throw new Error("Part not found");
+
+    if (data.quantity < 0) {
+      await this.recordPurchaseReturn({
+        partId: data.partId,
+        batchId: data.batchId,
+        quantity: Math.abs(data.quantity),
+        reason: data.reason,
+      });
+    } else if (data.quantity > 0) {
+      await this.createPurchaseBatch({
+        partId: data.partId,
+        partName: part.name,
+        qtyPurchased: data.quantity,
+        costPrice: part.purchasePrice,
+        supplier: "Stock Adjustment",
+        notes: data.reason,
+      });
+    }
+
+    const adjustments = this.getItem<StockAdjustment[]>(STORAGE_KEYS.STOCK_ADJUSTMENTS, []);
+    const adj: StockAdjustment = {
+      id: `adj-${Date.now()}`,
+      type: "adjustment",
+      partId: data.partId,
+      partName: part.name,
+      batchId: data.batchId,
+      quantity: data.quantity,
+      reason: data.reason || "Stock Adjustment",
+      costPrice: part.purchasePrice,
+      createdAt: new Date().toISOString(),
+    };
+    adjustments.unshift(adj);
+    this.setItem(STORAGE_KEYS.STOCK_ADJUSTMENTS, adjustments);
+    return adj;
+  }
+
+  async getSaleDetails(billId?: string, partId?: string): Promise<SaleDetail[]> {
+    const details = this.getItem<SaleDetail[]>(STORAGE_KEYS.SALE_DETAILS, []);
+    let list = details;
+    if (billId) list = list.filter((d) => d.billId === billId);
+    if (partId) list = list.filter((d) => d.partId === partId);
+    return list;
   }
 
   // --- CUSTOMERS ---

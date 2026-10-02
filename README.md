@@ -1,4 +1,4 @@
-# Gilani Autos — Bike Shop Management Software
+# Jilani Autos — Bike Shop Management Software
 
 > **Complete Motorcycle Spare Parts Shop Management System** built with **Next.js 14 (App Router)**, **Tailwind CSS**, **Shadcn UI (Light Theme & Glassmorphism)**, **NextAuth**, and a clean **Repository Pattern** (Local-first persistent storage, ready for MongoDB).
 
@@ -107,4 +107,4 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ---
 
 ## 📄 License
-Private commercial software for **Gilani Autos**, Karachi, Sindh, Pakistan.
+Private commercial software for **Jilani Autos**, Karachi, Sindh, Pakistan.

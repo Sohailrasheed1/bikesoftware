@@ -54,7 +54,7 @@ export function ReceiptModal({ bill, isOpen, onClose }: ReceiptModalProps) {
       (bill.discount > 0 ? `Discount: -Rs. ${bill.discount}\n` : "") +
       `*Grand Total: Rs. ${bill.grandTotal}*\n` +
       `Payment: ${bill.paymentMethod} (Paid: Rs. ${bill.paidAmount})\n\n` +
-      `Thank you for visiting Gilani Autos, Karachi!\n` +
+      `Thank you for visiting Jilani Autos, Karachi!\n` +
       `Ph: 0300-1234567`;
 
     const url = phone

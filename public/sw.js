@@ -1,4 +1,4 @@
-const CACHE_NAME = "gilani-autos-pwa-v1";
+const CACHE_NAME = "jilani-autos-pwa-v1";
 
 const STATIC_ASSETS = [
   "/",
@@ -83,7 +83,7 @@ self.addEventListener("fetch", (event) => {
           }
         }
 
-        return new Response("Offline - Gilani Autos Software", {
+        return new Response("Offline - Jilani Autos Software", {
           status: 503,
           statusText: "Service Unavailable",
           headers: new Headers({ "Content-Type": "text/plain" }),

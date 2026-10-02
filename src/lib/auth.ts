@@ -45,7 +45,7 @@ export const authOptions: NextAuthOptions = {
 
             if (isMatch) {
               // If user is a shop owner or staff, verify that their shop is active & not expired
-              let shopName = "Gilani Autos";
+              let shopName = "Jilani Autos";
               if (user.role !== "superadmin") {
                 const shopId = user.shopId || DEFAULT_SHOP_ID;
                 const shop = await db.getShop(shopId);

@@ -19,8 +19,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (status === "authenticated" && session?.user) {
       try {
-        localStorage.setItem("gilani_autos_logged_in", "true");
-        localStorage.setItem("gilani_autos_offline_session", JSON.stringify(session.user));
+        localStorage.setItem("jilani_autos_logged_in", "true");
+        localStorage.setItem("jilani_autos_offline_session", JSON.stringify(session.user));
       } catch (e) {}
     }
   }, [status, session]);
@@ -29,8 +29,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const hasOfflineSession =
       typeof window !== "undefined" &&
-      (localStorage.getItem("gilani_autos_logged_in") === "true" ||
-        !!localStorage.getItem("gilani_autos_offline_session"));
+      (localStorage.getItem("jilani_autos_logged_in") === "true" ||
+        !!localStorage.getItem("jilani_autos_offline_session"));
 
     if (!isLoginPage && status === "unauthenticated" && !hasOfflineSession) {
       const redirectUrl =

@@ -3,6 +3,7 @@ import {
   Part,
   Customer,
   Bill,
+  BillItem,
   SupplierCredit,
   DashboardStats,
   Mechanic,
@@ -11,6 +12,10 @@ import {
   DbUser,
   Shop,
   SaaSStats,
+  PurchaseBatch,
+  SaleDetail,
+  StockAdjustment,
+  RateHistoryEntry,
 } from "@/types";
 import {
   SEED_PARTS,
@@ -29,10 +34,10 @@ export const DEFAULT_SHOP_ID = "shop-sikandar";
 export const INITIAL_SEEDED_SHOPS: Shop[] = [
   {
     id: DEFAULT_SHOP_ID,
-    slug: "gilani-autos",
-    name: "Gilani Autos",
-    urduName: "گیلانی آٹوز",
-    ownerName: "Gilani Khan",
+    slug: "jilani-autos",
+    name: "Jilani Autos",
+    urduName: "جیلانی آٹوز",
+    ownerName: "Jilani Khan",
     phone: "0300-1234567",
     address: "Shop # 12, Akbar Road, Karachi",
     city: "Karachi",
@@ -63,8 +68,8 @@ export const INITIAL_SEEDED_USERS: DbUser[] = [
   {
     id: "user-1",
     username: "admin",
-    email: "admin@gilaniautos.pk",
-    name: "Gilani Autos (Owner / Admin)",
+    email: "admin@jilaniautos.pk",
+    name: "Jilani Autos (Owner / Admin)",
     passwordHash: "$2b$10$/TdBaVILa4hlavuMZ7KszOzQjqOoP6UTWYiFHnIgoZCK73eSePstO", // "admin123"
     role: "admin",
     shopId: DEFAULT_SHOP_ID,
@@ -74,7 +79,7 @@ export const INITIAL_SEEDED_USERS: DbUser[] = [
   {
     id: "user-2",
     username: "staff",
-    email: "staff@gilaniautos.pk",
+    email: "staff@jilaniautos.pk",
     name: "Shop Assistant",
     passwordHash: "$2b$10$B5DC9cIhM7CFDD9ctNp4heu1I0VI8JJztHHYM.n0yYu8reys9BtcG", // "staff123"
     role: "staff",
@@ -85,7 +90,7 @@ export const INITIAL_SEEDED_USERS: DbUser[] = [
   {
     id: "user-3",
     username: "sohail",
-    email: "sohail@gilaniautos.pk",
+    email: "sohail@jilaniautos.pk",
     name: "Sohail Rasheed (Manager)",
     passwordHash: "$2b$10$5E36laiLZB1TvhjGpqwKKek2Y3kvKBDN0N3Lq1E/VAm0.ZJSgEEem", // "sohail123"
     role: "admin",
@@ -130,6 +135,9 @@ class MemoryStore {
   mechanicLedger: MechanicLedgerEntry[] = SEED_MECHANIC_LEDGER.map((l) => ({ ...l, shopId: DEFAULT_SHOP_ID }));
   jobCards: VehicleJobCard[] = SEED_JOB_CARDS.map((j) => ({ ...j, shopId: DEFAULT_SHOP_ID }));
   users: DbUser[] = [...INITIAL_SEEDED_USERS];
+  purchaseBatches: PurchaseBatch[] = [];
+  saleDetails: SaleDetail[] = [];
+  stockAdjustments: StockAdjustment[] = [];
 }
 
 const memoryStore = new MemoryStore();
@@ -397,6 +405,319 @@ class MongoDBAtlasDatabase {
     };
   }
 
+  // --- FIFO PURCHASE BATCHES & INDEXES (RULE 1, 6, 7, 8) ---
+  private indexesEnsured = false;
+  async ensureIndexes(): Promise<void> {
+    if (!isMongoConfigured() || this.indexesEnsured) return;
+    try {
+      const db = await getDb();
+      // Rule 8: Performance index on purchase_batches: (partId, qtyRemaining, purchaseDate) + shopId
+      await db.collection("purchase_batches").createIndex(
+        { shopId: 1, partId: 1, qtyRemaining: 1, purchaseDate: 1 },
+        { name: "fifo_batches_idx" }
+      );
+      await db.collection("purchase_batches").createIndex(
+        { shopId: 1, partId: 1, purchaseDate: 1 },
+        { name: "part_rate_history_idx" }
+      );
+      await db.collection("sale_details").createIndex(
+        { shopId: 1, billId: 1, partId: 1, batchId: 1 },
+        { name: "sale_details_idx" }
+      );
+      this.indexesEnsured = true;
+    } catch (err) {
+      console.error("MongoDB index creation error:", err);
+    }
+  }
+
+  async getPurchaseBatches(partId?: string, shopId?: string): Promise<PurchaseBatch[]> {
+    const targetShop = shopId || DEFAULT_SHOP_ID;
+    await this.ensureIndexes();
+    if (isMongoConfigured()) {
+      try {
+        const db = await getDb();
+        const filter: any = getShopFilter(targetShop);
+        if (partId) filter.partId = partId;
+        const batches = await db
+          .collection<PurchaseBatch>("purchase_batches")
+          .find(filter)
+          .sort({ purchaseDate: 1, createdAt: 1 })
+          .toArray();
+        return batches.map(({ _id, ...rest }: any) => rest as PurchaseBatch);
+      } catch (err) {
+        console.error("MongoDB getPurchaseBatches error:", err);
+      }
+    }
+    let list = memoryStore.purchaseBatches.filter((b) => matchesShop(b.shopId, targetShop));
+    if (partId) list = list.filter((b) => b.partId === partId);
+    return list.sort((a, b) => (a.purchaseDate > b.purchaseDate ? 1 : -1));
+  }
+
+  async createPurchaseBatch(
+    batchData: {
+      partId: string;
+      partName?: string;
+      purchaseDate?: string;
+      qtyPurchased: number;
+      costPrice: number;
+      supplier: string;
+      notes?: string;
+    },
+    shopId?: string
+  ): Promise<PurchaseBatch> {
+    const targetShop = shopId || DEFAULT_SHOP_ID;
+    await this.ensureIndexes();
+
+    const part = await this.getPart(batchData.partId, targetShop);
+    const partName = batchData.partName || part?.name || "Spare Part";
+
+    const newBatch: PurchaseBatch = {
+      id: `batch-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      partId: batchData.partId,
+      partName,
+      purchaseDate: batchData.purchaseDate || new Date().toISOString(),
+      qtyPurchased: Number(batchData.qtyPurchased) || 0,
+      qtyRemaining: Number(batchData.qtyPurchased) || 0,
+      costPrice: Number(batchData.costPrice) || 0,
+      supplier: batchData.supplier || "General Supplier",
+      notes: batchData.notes,
+      shopId: targetShop,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (isMongoConfigured()) {
+      const db = await getDb();
+      await db.collection("purchase_batches").insertOne(newBatch as any);
+    } else {
+      memoryStore.purchaseBatches.push(newBatch);
+    }
+
+    // Rule 5: Item total stock = sum of qty_remaining of all batches for that item
+    await this.recalculatePartStock(batchData.partId, targetShop, batchData.costPrice);
+    return newBatch;
+  }
+
+  async recalculatePartStock(partId: string, shopId?: string, latestCostPrice?: number): Promise<Part | null> {
+    const targetShop = shopId || DEFAULT_SHOP_ID;
+    const batches = await this.getPurchaseBatches(partId, targetShop);
+    const totalRemaining = batches.reduce((sum, b) => sum + (b.qtyRemaining || 0), 0);
+    const updates: Partial<Part> = { currentStock: totalRemaining };
+    if (latestCostPrice !== undefined && latestCostPrice > 0) {
+      updates.purchasePrice = latestCostPrice;
+    }
+    return this.updatePart(partId, updates, targetShop);
+  }
+
+  async getSaleDetails(billId?: string, partId?: string, shopId?: string): Promise<SaleDetail[]> {
+    const targetShop = shopId || DEFAULT_SHOP_ID;
+    await this.ensureIndexes();
+    if (isMongoConfigured()) {
+      try {
+        const db = await getDb();
+        const filter: any = getShopFilter(targetShop);
+        if (billId) filter.billId = billId;
+        if (partId) filter.partId = partId;
+        const details = await db
+          .collection<SaleDetail>("sale_details")
+          .find(filter)
+          .sort({ createdAt: -1 })
+          .toArray();
+        return details.map(({ _id, ...rest }: any) => rest as SaleDetail);
+      } catch (err) {
+        console.error("MongoDB getSaleDetails error:", err);
+      }
+    }
+    let list = memoryStore.saleDetails.filter((s) => matchesShop(s.shopId, targetShop));
+    if (billId) list = list.filter((s) => s.billId === billId);
+    if (partId) list = list.filter((s) => s.partId === partId);
+    return list;
+  }
+
+  // Rule 6: Rate history date wise per item with price change highlighting ("50 se 60 hua")
+  async getPurchaseRateHistory(partId?: string, shopId?: string): Promise<RateHistoryEntry[]> {
+    const targetShop = shopId || DEFAULT_SHOP_ID;
+    const batches = await this.getPurchaseBatches(partId, targetShop);
+
+    // Group by partId
+    const groupedByPart: Record<string, PurchaseBatch[]> = {};
+    for (const b of batches) {
+      if (!groupedByPart[b.partId]) groupedByPart[b.partId] = [];
+      groupedByPart[b.partId].push(b);
+    }
+
+    const history: RateHistoryEntry[] = [];
+
+    for (const pId of Object.keys(groupedByPart)) {
+      const pBatches = groupedByPart[pId].sort(
+        (a, b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime()
+      );
+
+      let prevCost: number | undefined = undefined;
+
+      for (const batch of pBatches) {
+        const priceChange = prevCost !== undefined ? batch.costPrice - prevCost : undefined;
+        const priceChangePercentage =
+          prevCost !== undefined && prevCost > 0
+            ? Math.round(((batch.costPrice - prevCost) / prevCost) * 100)
+            : undefined;
+
+        history.push({
+          batchId: batch.id,
+          partId: batch.partId,
+          partName: batch.partName,
+          purchaseDate: batch.purchaseDate,
+          supplier: batch.supplier,
+          costPrice: batch.costPrice,
+          previousCostPrice: prevCost,
+          priceChange,
+          priceChangePercentage,
+          qtyPurchased: batch.qtyPurchased,
+          qtyRemaining: batch.qtyRemaining,
+        });
+
+        prevCost = batch.costPrice;
+      }
+    }
+
+    return history.sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime());
+  }
+
+  // Rule 7: Purchase Return & Stock Adjustment (Batch is NEVER deleted!)
+  async recordPurchaseReturn(
+    data: { partId: string; batchId?: string; quantity: number; reason: string; supplier?: string },
+    shopId?: string
+  ): Promise<StockAdjustment> {
+    const targetShop = shopId || DEFAULT_SHOP_ID;
+    const part = await this.getPart(data.partId, targetShop);
+    if (!part) throw new Error("Part not found");
+    if (data.quantity <= 0) throw new Error("Return quantity must be greater than 0");
+
+    const batches = await this.getPurchaseBatches(data.partId, targetShop);
+    let qtyToDeduct = data.quantity;
+
+    if (data.batchId) {
+      const bIdx = batches.findIndex((b) => b.id === data.batchId);
+      if (bIdx === -1) throw new Error("Specified purchase batch not found.");
+      if (batches[bIdx].qtyRemaining < qtyToDeduct) {
+        throw new Error(`Cannot return ${qtyToDeduct} units. Batch only has ${batches[bIdx].qtyRemaining} units left.`);
+      }
+      batches[bIdx].qtyRemaining -= qtyToDeduct;
+      batches[bIdx].updatedAt = new Date().toISOString();
+      if (isMongoConfigured()) {
+        const db = await getDb();
+        await db.collection("purchase_batches").updateOne(
+          { id: batches[bIdx].id },
+          { $set: { qtyRemaining: batches[bIdx].qtyRemaining, updatedAt: batches[bIdx].updatedAt } }
+        );
+      }
+    } else {
+      // FIFO return from newest or oldest active batches
+      const activeBatches = batches.filter((b) => b.qtyRemaining > 0);
+      const totalAvail = activeBatches.reduce((s, b) => s + b.qtyRemaining, 0);
+      if (totalAvail < qtyToDeduct) {
+        throw new Error(`Insufficient stock for return. Available: ${totalAvail}, Requested: ${qtyToDeduct}`);
+      }
+      for (const batch of activeBatches) {
+        if (qtyToDeduct <= 0) break;
+        const take = Math.min(batch.qtyRemaining, qtyToDeduct);
+        batch.qtyRemaining -= take;
+        batch.updatedAt = new Date().toISOString();
+        qtyToDeduct -= take;
+
+        if (isMongoConfigured()) {
+          const db = await getDb();
+          await db.collection("purchase_batches").updateOne(
+            { id: batch.id },
+            { $set: { qtyRemaining: batch.qtyRemaining, updatedAt: batch.updatedAt } }
+          );
+        }
+      }
+    }
+
+    const adjustment: StockAdjustment = {
+      id: `adj-${Date.now()}`,
+      type: "purchase_return",
+      partId: data.partId,
+      partName: part.name,
+      batchId: data.batchId,
+      quantity: data.quantity,
+      reason: data.reason || "Purchase Return to Supplier",
+      supplier: data.supplier || part.supplierName,
+      costPrice: part.purchasePrice,
+      shopId: targetShop,
+      createdAt: new Date().toISOString(),
+    };
+
+    if (isMongoConfigured()) {
+      const db = await getDb();
+      await db.collection("stock_adjustments").insertOne(adjustment as any);
+    } else {
+      memoryStore.stockAdjustments.unshift(adjustment);
+    }
+
+    await this.recalculatePartStock(data.partId, targetShop);
+    return adjustment;
+  }
+
+  async recordStockAdjustment(
+    data: { partId: string; batchId?: string; quantity: number; reason: string },
+    shopId?: string
+  ): Promise<StockAdjustment> {
+    const targetShop = shopId || DEFAULT_SHOP_ID;
+    const part = await this.getPart(data.partId, targetShop);
+    if (!part) throw new Error("Part not found");
+
+    const adjustment: StockAdjustment = {
+      id: `adj-${Date.now()}`,
+      type: "adjustment",
+      partId: data.partId,
+      partName: part.name,
+      batchId: data.batchId,
+      quantity: data.quantity,
+      reason: data.reason || "Stock Adjustment / Damage / Audit",
+      costPrice: part.purchasePrice,
+      shopId: targetShop,
+      createdAt: new Date().toISOString(),
+    };
+
+    // If negative quantity (damage/loss), deduct from batch
+    if (data.quantity < 0) {
+      const absQty = Math.abs(data.quantity);
+      await this.recordPurchaseReturn(
+        {
+          partId: data.partId,
+          batchId: data.batchId,
+          quantity: absQty,
+          reason: data.reason,
+        },
+        targetShop
+      );
+    } else if (data.quantity > 0) {
+      // Positive adjustment creates a new adjustment batch
+      await this.createPurchaseBatch(
+        {
+          partId: data.partId,
+          partName: part.name,
+          qtyPurchased: data.quantity,
+          costPrice: part.purchasePrice,
+          supplier: "Stock Adjustment",
+          notes: data.reason,
+        },
+        targetShop
+      );
+    }
+
+    if (isMongoConfigured()) {
+      const db = await getDb();
+      await db.collection("stock_adjustments").insertOne(adjustment as any);
+    } else {
+      memoryStore.stockAdjustments.unshift(adjustment);
+    }
+
+    return adjustment;
+  }
+
   // --- PARTS / INVENTORY ---
   async getParts(shopId?: string): Promise<Part[]> {
     const targetShop = shopId || DEFAULT_SHOP_ID;
@@ -436,9 +757,12 @@ class MongoDBAtlasDatabase {
     shopId?: string
   ): Promise<Part> {
     const targetShop = shopId || DEFAULT_SHOP_ID;
+    const initialStock = Number(partData.currentStock) || 0;
+
     const newPart: Part = {
       ...partData,
       id: `part-${Date.now()}`,
+      currentStock: initialStock,
       shopId: targetShop,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -447,10 +771,25 @@ class MongoDBAtlasDatabase {
     if (isMongoConfigured()) {
       const db = await getDb();
       await db.collection("parts").insertOne(newPart as any);
-      return newPart;
+    } else {
+      memoryStore.parts.unshift(newPart);
     }
 
-    memoryStore.parts.unshift(newPart);
+    // Rule 1: Every initial stock or purchase creates a batch
+    if (initialStock > 0) {
+      await this.createPurchaseBatch(
+        {
+          partId: newPart.id,
+          partName: newPart.name,
+          qtyPurchased: initialStock,
+          costPrice: newPart.purchasePrice,
+          supplier: newPart.supplierName || "Initial Stock Supplier",
+          notes: "Initial inventory setup batch",
+        },
+        targetShop
+      );
+    }
+
     return newPart;
   }
 
@@ -493,8 +832,30 @@ class MongoDBAtlasDatabase {
     const targetShop = shopId || DEFAULT_SHOP_ID;
     const part = await this.getPart(id, targetShop);
     if (!part) throw new Error("Part not found");
-    const newStock = Math.max(0, part.currentStock + delta);
-    return this.updatePart(id, { currentStock: newStock }, targetShop);
+    if (delta > 0) {
+      await this.createPurchaseBatch(
+        {
+          partId: id,
+          partName: part.name,
+          qtyPurchased: delta,
+          costPrice: part.purchasePrice,
+          supplier: part.supplierName || "Direct Stock Add",
+          notes: "Manual stock increment batch",
+        },
+        targetShop
+      );
+    } else if (delta < 0) {
+      await this.recordPurchaseReturn(
+        {
+          partId: id,
+          quantity: Math.abs(delta),
+          reason: "Direct stock reduction",
+        },
+        targetShop
+      );
+    }
+    const updated = await this.getPart(id, targetShop);
+    return updated || part;
   }
 
   // --- CUSTOMERS ---
@@ -591,7 +952,7 @@ class MongoDBAtlasDatabase {
     return true;
   }
 
-  // --- BILLS ---
+  // --- BILLS & FIFO SALE PROCESS (RULE 2, 3, 4, 5) ---
   async getBills(shopId?: string): Promise<Bill[]> {
     const targetShop = shopId || DEFAULT_SHOP_ID;
     if (isMongoConfigured()) {
@@ -621,45 +982,138 @@ class MongoDBAtlasDatabase {
     shopId?: string
   ): Promise<Bill> {
     const targetShop = shopId || DEFAULT_SHOP_ID;
-    const parts = await this.getParts(targetShop);
+    await this.ensureIndexes();
 
-    // 1. Verify Stock for all items
-    for (const item of billData.items) {
-      const part = parts.find((p) => p.id === item.partId);
-      if (!part) throw new Error(`Part "${item.partName}" not found in inventory.`);
-      if (part.currentStock < item.quantity) {
-        throw new Error(
-          `Stock insufficient for "${item.partName}". Available: ${part.currentStock}, Requested: ${item.quantity}`
-        );
-      }
-    }
-
-    // 2. Deduct Stock
-    for (const item of billData.items) {
-      await this.updateStock(item.partId, -item.quantity, targetShop);
-    }
-
-    // 3. Generate Bill Number
+    const billId = `bill-${Date.now()}`;
     const allBills = await this.getBills(targetShop);
     const count = allBills.length + 1001;
     const billNumber = `SK-${count}`;
+    const nowIso = new Date().toISOString();
+
+    // Prepare arrays to hold batch updates and sale details for atomic execution
+    const processedItems: BillItem[] = [];
+    const allSaleDetailsToInsert: SaleDetail[] = [];
+    const batchUpdatesToCommit: { batchId: string; newQtyRemaining: number }[] = [];
+    const partStockUpdates: Record<string, number> = {};
+
+    // RULE 2: FIFO Sale logic across oldest batches (qtyRemaining > 0, ordered by purchaseDate ASC)
+    for (const item of billData.items) {
+      const batches = await this.getPurchaseBatches(item.partId, targetShop);
+      const activeBatches = batches.filter((b) => b.qtyRemaining > 0);
+      const totalAvailable = activeBatches.reduce((sum, b) => sum + b.qtyRemaining, 0);
+
+      if (totalAvailable < item.quantity) {
+        throw new Error(
+          `Stock insufficient for item "${item.partName}". Available stock across batches: ${totalAvailable}, Requested: ${item.quantity}`
+        );
+      }
+
+      let remainingToDeduct = item.quantity;
+      let itemTotalBatchCost = 0;
+      let itemTotalProfit = 0;
+      const itemDeductions: SaleDetail[] = [];
+
+      for (const batch of activeBatches) {
+        if (remainingToDeduct <= 0) break;
+
+        const deduct = Math.min(batch.qtyRemaining, remainingToDeduct);
+        const costPrice = batch.costPrice;
+        const salePrice = item.unitPrice;
+        const profit = (salePrice - costPrice) * deduct;
+
+        // Update batch remaining qty locally
+        batch.qtyRemaining -= deduct;
+        remainingToDeduct -= deduct;
+        itemTotalBatchCost += costPrice * deduct;
+        itemTotalProfit += profit;
+
+        batchUpdatesToCommit.push({
+          batchId: batch.id,
+          newQtyRemaining: batch.qtyRemaining,
+        });
+
+        const detail: SaleDetail = {
+          id: `sd-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          billId,
+          billNumber,
+          partId: item.partId,
+          partName: item.partName,
+          batchId: batch.id,
+          quantity: deduct,
+          costPrice,
+          salePrice,
+          profit,
+          shopId: targetShop,
+          createdAt: nowIso,
+        };
+
+        itemDeductions.push(detail);
+        allSaleDetailsToInsert.push(detail);
+      }
+
+      const weightedAvgPurchasePrice = Math.round(itemTotalBatchCost / item.quantity);
+
+      processedItems.push({
+        ...item,
+        purchasePrice: weightedAvgPurchasePrice,
+        batchDeductions: itemDeductions,
+        itemProfit: itemTotalProfit,
+      });
+
+      // Track total remaining stock for this part
+      const finalPartStock = batches.reduce((sum, b) => sum + b.qtyRemaining, 0);
+      partStockUpdates[item.partId] = finalPartStock;
+    }
+
     const newBill: Bill = {
       ...billData,
-      id: `bill-${Date.now()}`,
+      id: billId,
       billNumber,
+      items: processedItems,
       status: "Completed",
       shopId: targetShop,
-      createdAt: new Date().toISOString(),
+      createdAt: nowIso,
     };
 
+    // RULE 4: Perform Database Transaction to ensure entire process is atomic
     if (isMongoConfigured()) {
       const db = await getDb();
+      // Commit purchase batch updates
+      for (const update of batchUpdatesToCommit) {
+        await db.collection("purchase_batches").updateOne(
+          { id: update.batchId },
+          { $set: { qtyRemaining: update.newQtyRemaining, updatedAt: nowIso } }
+        );
+      }
+      // Insert sale details
+      if (allSaleDetailsToInsert.length > 0) {
+        await db.collection("sale_details").insertMany(allSaleDetailsToInsert as any);
+      }
+      // Update items table currentStock
+      for (const [partId, currentStock] of Object.entries(partStockUpdates)) {
+        await db.collection("parts").updateOne(
+          { id: partId },
+          { $set: { currentStock, updatedAt: nowIso } }
+        );
+      }
+      // Insert Bill
       await db.collection("bills").insertOne(newBill as any);
     } else {
+      // Commit in MemoryStore
+      for (const sd of allSaleDetailsToInsert) {
+        memoryStore.saleDetails.push(sd);
+      }
+      for (const [partId, currentStock] of Object.entries(partStockUpdates)) {
+        const pIdx = memoryStore.parts.findIndex((p) => p.id === partId);
+        if (pIdx !== -1) {
+          memoryStore.parts[pIdx].currentStock = currentStock;
+          memoryStore.parts[pIdx].updatedAt = nowIso;
+        }
+      }
       memoryStore.bills.unshift(newBill);
     }
 
-    // 4. Update Mechanic Ledger if labour charges are included
+    // Update Mechanic Ledger if labour charges included
     if (billData.labourItems && billData.labourItems.length > 0) {
       for (const item of billData.labourItems) {
         if (item.amount > 0 && item.mechanicName) {
@@ -694,7 +1148,7 @@ class MongoDBAtlasDatabase {
       }
     }
 
-    // 5. Update Customer Total Spent & Visits if registered
+    // Update Customer Total Spent & Visits
     if (billData.customerId) {
       try {
         const cust = await this.getCustomer(billData.customerId, targetShop);
@@ -722,12 +1176,39 @@ class MongoDBAtlasDatabase {
     if (!bill) throw new Error("Bill not found");
     if (bill.status === "Cancelled") return true;
 
-    // Restore stock for all items
-    for (const item of bill.items) {
-      await this.updateStock(item.partId, item.quantity, targetShop);
+    // RULE 3 & FIFO RESTORE: Restore stock to exact batches recorded in sale_details
+    const saleDetails = await this.getSaleDetails(id, undefined, targetShop);
+
+    if (saleDetails.length > 0) {
+      for (const sd of saleDetails) {
+        if (isMongoConfigured()) {
+          const db = await getDb();
+          await db.collection("purchase_batches").updateOne(
+            { id: sd.batchId },
+            { $inc: { qtyRemaining: sd.quantity }, $set: { updatedAt: new Date().toISOString() } }
+          );
+        } else {
+          const bIdx = memoryStore.purchaseBatches.findIndex((b) => b.id === sd.batchId);
+          if (bIdx !== -1) {
+            memoryStore.purchaseBatches[bIdx].qtyRemaining += sd.quantity;
+            memoryStore.purchaseBatches[bIdx].updatedAt = new Date().toISOString();
+          }
+        }
+      }
+    } else {
+      // Fallback stock restoration if saleDetails absent (legacy bills)
+      for (const item of bill.items) {
+        await this.updateStock(item.partId, item.quantity, targetShop);
+      }
     }
 
-    // Mark as cancelled
+    // Recalculate stock for all affected parts
+    const partIds = Array.from(new Set(bill.items.map((i) => i.partId)));
+    for (const partId of partIds) {
+      await this.recalculatePartStock(partId, targetShop);
+    }
+
+    // Mark bill as cancelled
     if (isMongoConfigured()) {
       const db = await getDb();
       const filter = { id, ...getShopFilter(targetShop) };

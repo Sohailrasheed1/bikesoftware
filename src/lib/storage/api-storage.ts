@@ -7,6 +7,10 @@ import {
   Mechanic,
   MechanicLedgerEntry,
   VehicleJobCard,
+  PurchaseBatch,
+  SaleDetail,
+  StockAdjustment,
+  RateHistoryEntry,
 } from "@/types";
 import { IStorageService } from "./types";
 
@@ -32,7 +36,7 @@ export class ApiStorageService implements IStorageService {
     return (await res.json()) as T;
   }
 
-  // --- PARTS / INVENTORY ---
+  // --- PARTS & FIFO BATCHES ---
   async getParts(): Promise<Part[]> {
     return this.request<Part[]>("/api/parts");
   }
@@ -67,6 +71,64 @@ export class ApiStorageService implements IStorageService {
       method: "POST",
       body: JSON.stringify({ delta }),
     });
+  }
+
+  async getPurchaseBatches(partId?: string): Promise<PurchaseBatch[]> {
+    const query = partId ? `?partId=${encodeURIComponent(partId)}` : "";
+    return this.request<PurchaseBatch[]>(`/api/parts/batches${query}`);
+  }
+
+  async createPurchaseBatch(batch: {
+    partId: string;
+    partName?: string;
+    purchaseDate?: string;
+    qtyPurchased: number;
+    costPrice: number;
+    supplier: string;
+    notes?: string;
+  }): Promise<PurchaseBatch> {
+    return this.request<PurchaseBatch>("/api/parts/batches", {
+      method: "POST",
+      body: JSON.stringify(batch),
+    });
+  }
+
+  async getPurchaseRateHistory(partId?: string): Promise<RateHistoryEntry[]> {
+    const query = partId ? `?partId=${encodeURIComponent(partId)}` : "";
+    return this.request<RateHistoryEntry[]>(`/api/reports/rate-history${query}`);
+  }
+
+  async recordPurchaseReturn(data: {
+    partId: string;
+    batchId?: string;
+    quantity: number;
+    reason: string;
+    supplier?: string;
+  }): Promise<StockAdjustment> {
+    return this.request<StockAdjustment>("/api/parts/returns", {
+      method: "POST",
+      body: JSON.stringify({ ...data, type: "purchase_return" }),
+    });
+  }
+
+  async recordStockAdjustment(data: {
+    partId: string;
+    batchId?: string;
+    quantity: number;
+    reason: string;
+  }): Promise<StockAdjustment> {
+    return this.request<StockAdjustment>("/api/parts/returns", {
+      method: "POST",
+      body: JSON.stringify({ ...data, type: "adjustment" }),
+    });
+  }
+
+  async getSaleDetails(billId?: string, partId?: string): Promise<SaleDetail[]> {
+    const params = new URLSearchParams();
+    if (billId) params.append("billId", billId);
+    if (partId) params.append("partId", partId);
+    const query = params.toString() ? `?${params.toString()}` : "";
+    return this.request<SaleDetail[]>(`/api/sales/details${query}`);
   }
 
   // --- CUSTOMERS ---

@@ -16,14 +16,14 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Gilani Autos — Complete Shop Management System",
+  title: "Jilani Autos — Complete Shop Management System",
   description:
-    "Professional motorcycle spare parts shop management software for Gilani Autos, Karachi. Bilingual: Roman Urdu & Proper Urdu with Inventory, Workshop, POS Billing, Customers, and Reports.",
+    "Professional motorcycle spare parts shop management software for Jilani Autos, Karachi. Bilingual: Roman Urdu & Proper Urdu with Inventory, Workshop, POS Billing, Customers, and Reports.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Gilani Autos",
+    title: "Jilani Autos",
   },
   other: {
     "mobile-web-app-capable": "yes",

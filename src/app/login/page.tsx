@@ -37,8 +37,8 @@ function LoginForm() {
   useEffect(() => {
     const hasOfflineSession =
       typeof window !== "undefined" &&
-      (localStorage.getItem("gilani_autos_logged_in") === "true" ||
-        !!localStorage.getItem("gilani_autos_offline_session"));
+      (localStorage.getItem("jilani_autos_logged_in") === "true" ||
+        !!localStorage.getItem("jilani_autos_offline_session"));
 
     if (status === "authenticated" || hasOfflineSession) {
       let isSuper = false;
@@ -46,7 +46,7 @@ function LoginForm() {
         isSuper = (session.user as any)?.role === "superadmin";
       } else if (typeof window !== "undefined") {
         try {
-          const offUser = JSON.parse(localStorage.getItem("gilani_autos_offline_session") || "{}");
+          const offUser = JSON.parse(localStorage.getItem("jilani_autos_offline_session") || "{}");
           isSuper = offUser.role === "superadmin";
         } catch {}
       }
@@ -72,7 +72,7 @@ function LoginForm() {
     const lowerU = u.toLowerCase().trim();
     let isMatched = false;
     let role = "admin";
-    let shopName = "Gilani Autos";
+    let shopName = "Jilani Autos";
 
     if (lowerU === "admin" && (p === "admin123" || p === "admin")) isMatched = true;
     if (lowerU === "staff" && (p === "staff123" || p === "staff")) { isMatched = true; role = "staff"; }
@@ -86,19 +86,19 @@ function LoginForm() {
     if (!isMatched) {
       // Check cached session
       try {
-        const cachedUser = JSON.parse(localStorage.getItem("gilani_autos_offline_session") || "{}");
+        const cachedUser = JSON.parse(localStorage.getItem("jilani_autos_offline_session") || "{}");
         if (cachedUser.name && cachedUser.name.toLowerCase() === lowerU) {
           isMatched = true;
           role = cachedUser.role || "admin";
-          shopName = cachedUser.shopName || "Gilani Autos";
+          shopName = cachedUser.shopName || "Jilani Autos";
         }
       } catch {}
     }
 
     if (isMatched) {
       const offlineUser = { id: `off-${lowerU}`, name: u, role, shopName };
-      localStorage.setItem("gilani_autos_logged_in", "true");
-      localStorage.setItem("gilani_autos_offline_session", JSON.stringify(offlineUser));
+      localStorage.setItem("jilani_autos_logged_in", "true");
+      localStorage.setItem("jilani_autos_offline_session", JSON.stringify(offlineUser));
 
       toast.success(
         isUrdu ? "آف لائن لاگ ان کامیاب! 📶" : "Offline Login Successful! 📶",
@@ -186,13 +186,13 @@ function LoginForm() {
           console.error("Session fetch error:", e);
         }
 
-        localStorage.setItem("gilani_autos_logged_in", "true");
+        localStorage.setItem("jilani_autos_logged_in", "true");
         localStorage.setItem(
-          "gilani_autos_offline_session",
+          "jilani_autos_offline_session",
           JSON.stringify({
             name: cleanUsername,
             role: isSuper ? "superadmin" : "admin",
-            shopName: isSuper ? "Platform Super Admin" : "Gilani Autos",
+            shopName: isSuper ? "Platform Super Admin" : "Jilani Autos",
           })
         );
 

@@ -693,7 +693,7 @@ export default function MechanicsPage() {
                 {/* Header for Print */}
                 <div className="text-center pb-3 border-b border-dashed border-slate-300">
                   <h2 className="text-base sm:text-lg font-black tracking-tight uppercase text-slate-900">
-                    GILANI AUTOS — MECHANIC KHATA
+                    JILANI AUTOS — MECHANIC KHATA
                   </h2>
                   <p className="text-xs font-bold text-indigo-700">
                     Mechanic: {selectedMechanicForLedger.name} ({selectedMechanicForLedger.phone})

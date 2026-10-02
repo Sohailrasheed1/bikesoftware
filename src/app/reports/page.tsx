@@ -57,7 +57,8 @@ export default function ReportsPage() {
   activeBills.forEach((bill) => {
     bill.items.forEach((item) => {
       totalItemsSold += item.quantity;
-      estimatedCost += item.purchasePrice * item.quantity;
+      const itemCost = item.quantity * item.purchasePrice;
+      estimatedCost += itemCost;
 
       if (!partSalesMap[item.partId]) {
         partSalesMap[item.partId] = {
@@ -72,7 +73,18 @@ export default function ReportsPage() {
     });
   });
 
-  const estimatedProfit = Math.max(0, totalRevenue - estimatedCost);
+  // Calculate net profit using exact FIFO batch profit when available, else estimate
+  const exactFifoProfit = activeBills.reduce((totalProfit, bill) => {
+    const billProfit = bill.items.reduce((sum, item) => {
+      if (item.itemProfit !== undefined) {
+        return sum + item.itemProfit;
+      }
+      return sum + (item.totalPrice - item.purchasePrice * item.quantity);
+    }, 0);
+    return totalProfit + billProfit;
+  }, 0);
+
+  const estimatedProfit = Math.max(0, exactFifoProfit || (totalRevenue - estimatedCost));
   const profitMarginPercent = totalRevenue > 0 ? Math.round((estimatedProfit / totalRevenue) * 100) : 0;
 
   const topSellingParts = Object.values(partSalesMap).sort(
@@ -113,7 +125,7 @@ export default function ReportsPage() {
     link.setAttribute("href", encodedUri);
     link.setAttribute(
       "download",
-      `gilani_autos_report_${reportType}_${todayStr}.csv`
+      `jilani_autos_report_${reportType}_${todayStr}.csv`
     );
     document.body.appendChild(link);
     link.click();

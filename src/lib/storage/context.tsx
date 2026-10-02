@@ -10,6 +10,10 @@ import {
   Mechanic,
   MechanicLedgerEntry,
   VehicleJobCard,
+  PurchaseBatch,
+  SaleDetail,
+  StockAdjustment,
+  RateHistoryEntry,
 } from "@/types";
 import { apiStorageService as storageService } from "./api-storage";
 
@@ -48,11 +52,35 @@ interface StoreContextType {
   refreshAll: () => Promise<void>;
   triggerManualSync: () => Promise<void>;
   
-  // Parts / Inventory CRUD
+  // Parts / Inventory & FIFO CRUD
   addPart: (part: Omit<Part, "id" | "createdAt" | "updatedAt">) => Promise<Part>;
   updatePart: (id: string, updates: Partial<Part>) => Promise<Part>;
   deletePart: (id: string) => Promise<boolean>;
   updateStock: (id: string, delta: number) => Promise<Part>;
+  getPurchaseBatches: (partId?: string) => Promise<PurchaseBatch[]>;
+  createPurchaseBatch: (batch: {
+    partId: string;
+    partName?: string;
+    purchaseDate?: string;
+    qtyPurchased: number;
+    costPrice: number;
+    supplier: string;
+    notes?: string;
+  }) => Promise<PurchaseBatch>;
+  getPurchaseRateHistory: (partId?: string) => Promise<RateHistoryEntry[]>;
+  recordPurchaseReturn: (data: {
+    partId: string;
+    batchId?: string;
+    quantity: number;
+    reason: string;
+    supplier?: string;
+  }) => Promise<StockAdjustment>;
+  recordStockAdjustment: (data: {
+    partId: string;
+    batchId?: string;
+    quantity: number;
+    reason: string;
+  }) => Promise<StockAdjustment>;
 
   // Customer CRUD
   addCustomer: (customer: Omit<Customer, "id" | "totalSpent" | "totalVisits" | "createdAt" | "updatedAt">) => Promise<Customer>;
@@ -148,7 +176,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const getOfflineQueue = (): OfflineQueue => {
     if (typeof window === "undefined") return emptyQueue;
     try {
-      const saved = localStorage.getItem("gilani_autos_offline_queue") || localStorage.getItem("skander_offline_queue");
+      const saved = localStorage.getItem("jilani_autos_offline_queue") || localStorage.getItem("gilani_autos_offline_queue") || localStorage.getItem("skander_offline_queue");
       return saved ? JSON.parse(saved) : emptyQueue;
     } catch {
       return emptyQueue;
@@ -158,7 +186,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const saveOfflineQueue = (q: OfflineQueue) => {
     if (typeof window === "undefined") return;
     try {
-      localStorage.setItem("gilani_autos_offline_queue", JSON.stringify(q));
+      localStorage.setItem("jilani_autos_offline_queue", JSON.stringify(q));
       const total =
         q.parts.length +
         q.customers.length +
@@ -241,13 +269,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   ) => {
     if (typeof window === "undefined") return;
     try {
-      localStorage.setItem("gilani_autos_cache_parts", JSON.stringify(p));
-      localStorage.setItem("gilani_autos_cache_customers", JSON.stringify(c));
-      localStorage.setItem("gilani_autos_cache_bills", JSON.stringify(b));
-      localStorage.setItem("gilani_autos_cache_credits", JSON.stringify(sc));
-      localStorage.setItem("gilani_autos_cache_mechanics", JSON.stringify(m));
-      localStorage.setItem("gilani_autos_cache_ledger", JSON.stringify(ml));
-      localStorage.setItem("gilani_autos_cache_jobCards", JSON.stringify(jc));
+      localStorage.setItem("jilani_autos_cache_parts", JSON.stringify(p));
+      localStorage.setItem("jilani_autos_cache_customers", JSON.stringify(c));
+      localStorage.setItem("jilani_autos_cache_bills", JSON.stringify(b));
+      localStorage.setItem("jilani_autos_cache_credits", JSON.stringify(sc));
+      localStorage.setItem("jilani_autos_cache_mechanics", JSON.stringify(m));
+      localStorage.setItem("jilani_autos_cache_ledger", JSON.stringify(ml));
+      localStorage.setItem("jilani_autos_cache_jobCards", JSON.stringify(jc));
     } catch {}
   };
 
@@ -307,13 +335,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       // Fallback to local cache
       if (typeof window !== "undefined") {
         try {
-          const cp = JSON.parse(localStorage.getItem("gilani_autos_cache_parts") || localStorage.getItem("skander_cache_parts") || "[]");
-          const cc = JSON.parse(localStorage.getItem("gilani_autos_cache_customers") || localStorage.getItem("skander_cache_customers") || "[]");
-          const cb = JSON.parse(localStorage.getItem("gilani_autos_cache_bills") || localStorage.getItem("skander_cache_bills") || "[]");
-          const csc = JSON.parse(localStorage.getItem("gilani_autos_cache_credits") || localStorage.getItem("skander_cache_credits") || "[]");
-          const cm = JSON.parse(localStorage.getItem("gilani_autos_cache_mechanics") || localStorage.getItem("skander_cache_mechanics") || "[]");
-          const cml = JSON.parse(localStorage.getItem("gilani_autos_cache_ledger") || localStorage.getItem("skander_cache_ledger") || "[]");
-          const cjc = JSON.parse(localStorage.getItem("gilani_autos_cache_jobCards") || localStorage.getItem("skander_cache_jobCards") || "[]");
+          const cp = JSON.parse(localStorage.getItem("jilani_autos_cache_parts") || localStorage.getItem("gilani_autos_cache_parts") || localStorage.getItem("skander_cache_parts") || "[]");
+          const cc = JSON.parse(localStorage.getItem("jilani_autos_cache_customers") || localStorage.getItem("gilani_autos_cache_customers") || localStorage.getItem("skander_cache_customers") || "[]");
+          const cb = JSON.parse(localStorage.getItem("jilani_autos_cache_bills") || localStorage.getItem("gilani_autos_cache_bills") || localStorage.getItem("skander_cache_bills") || "[]");
+          const csc = JSON.parse(localStorage.getItem("jilani_autos_cache_credits") || localStorage.getItem("gilani_autos_cache_credits") || localStorage.getItem("skander_cache_credits") || "[]");
+          const cm = JSON.parse(localStorage.getItem("jilani_autos_cache_mechanics") || localStorage.getItem("gilani_autos_cache_mechanics") || localStorage.getItem("skander_cache_mechanics") || "[]");
+          const cml = JSON.parse(localStorage.getItem("jilani_autos_cache_ledger") || localStorage.getItem("gilani_autos_cache_ledger") || localStorage.getItem("skander_cache_ledger") || "[]");
+          const cjc = JSON.parse(localStorage.getItem("jilani_autos_cache_jobCards") || localStorage.getItem("gilani_autos_cache_jobCards") || localStorage.getItem("skander_cache_jobCards") || "[]");
 
           if (cp.length > 0) setParts(cp);
           if (cc.length > 0) setCustomers(cc);
@@ -450,6 +478,51 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }
       return part!;
     }
+  };
+
+  const getPurchaseBatches = async (partId?: string) => {
+    return storageService.getPurchaseBatches(partId);
+  };
+
+  const createPurchaseBatch = async (batch: {
+    partId: string;
+    partName?: string;
+    purchaseDate?: string;
+    qtyPurchased: number;
+    costPrice: number;
+    supplier: string;
+    notes?: string;
+  }) => {
+    const res = await storageService.createPurchaseBatch(batch);
+    await refreshAll();
+    return res;
+  };
+
+  const getPurchaseRateHistory = async (partId?: string) => {
+    return storageService.getPurchaseRateHistory(partId);
+  };
+
+  const recordPurchaseReturn = async (data: {
+    partId: string;
+    batchId?: string;
+    quantity: number;
+    reason: string;
+    supplier?: string;
+  }) => {
+    const res = await storageService.recordPurchaseReturn(data);
+    await refreshAll();
+    return res;
+  };
+
+  const recordStockAdjustment = async (data: {
+    partId: string;
+    batchId?: string;
+    quantity: number;
+    reason: string;
+  }) => {
+    const res = await storageService.recordStockAdjustment(data);
+    await refreshAll();
+    return res;
   };
 
   // Customer CRUD
@@ -1008,6 +1081,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         updatePart,
         deletePart,
         updateStock,
+        getPurchaseBatches,
+        createPurchaseBatch,
+        getPurchaseRateHistory,
+        recordPurchaseReturn,
+        recordStockAdjustment,
         addCustomer,
         updateCustomer,
         deleteCustomer,

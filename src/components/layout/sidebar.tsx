@@ -203,7 +203,7 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
             </div>
             <div>
               <div className="text-xs font-bold text-slate-800 leading-tight">
-                {session?.user?.name || "Gilani Autos (Admin)"}
+                {session?.user?.name || "Jilani Autos (Admin)"}
               </div>
               <div className="text-[11px] text-slate-500 font-medium">
                 {(session?.user as any)?.role === "staff"
@@ -219,8 +219,8 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
           <button
             onClick={async () => {
               if (typeof window !== "undefined") {
-                localStorage.removeItem("gilani_autos_offline_session");
-                localStorage.removeItem("gilani_autos_logged_in");
+                localStorage.removeItem("jilani_autos_offline_session");
+                localStorage.removeItem("jilani_autos_logged_in");
               }
               await signOut({ callbackUrl: "/login" });
             }}

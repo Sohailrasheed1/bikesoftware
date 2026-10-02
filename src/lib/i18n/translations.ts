@@ -199,7 +199,7 @@ export interface TranslationDictionary {
 export const translations: Record<Language, TranslationDictionary> = {
   roman: {
     // Common / Navigation
-    appName: "GILANI AUTOS",
+    appName: "JILANI AUTOS",
     appSubtitle: "Motorcycle Workshop & Spare Parts Software",
     counterOpen: "Counter Khula Hai",
     welcome: "Khush Amdeed, Dukan Ka Khulasa 🏍️",
@@ -395,7 +395,7 @@ export const translations: Record<Language, TranslationDictionary> = {
 
   ur: {
     // Common / Navigation
-    appName: "گیلانی آٹوز",
+    appName: "جیلانی آٹوز",
     appSubtitle: "موٹر سائیکل ورکشاپ و اسپیئر پارٹس مینجمنٹ سافٹ ویئر",
     counterOpen: "کاؤنٹر کھلا ہے",
     welcome: "خوش آمدید، دکان کا خلاصہ 🏍️",
