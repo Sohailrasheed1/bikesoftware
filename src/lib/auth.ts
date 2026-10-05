@@ -2,6 +2,7 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { db, DEFAULT_SHOP_ID } from "./server/db";
+import { getAuthSecret } from "./server/env";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -125,5 +126,5 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET || "skander_spare_parts_super_secret_jwt_key_2026_xyz",
+  secret: getAuthSecret(),
 };

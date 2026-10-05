@@ -37,20 +37,15 @@ function LoginForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // If already authenticated via official session, redirect immediately away from login
+  // Clean up any stale unverified offline keys when unauthenticated
   useEffect(() => {
-    if (status === "authenticated") {
-      const isSuper = (session?.user as any)?.role === "superadmin";
-      const target = isSuper ? "/super-admin" : cleanCallbackUrl;
-      window.location.replace(target);
-    } else if (status === "unauthenticated" && typeof window !== "undefined") {
-      // Purge any stale unverified offline keys to prevent unauthorized bypass
+    if (status === "unauthenticated" && typeof window !== "undefined") {
       localStorage.removeItem("jilani_autos_logged_in");
       localStorage.removeItem("gilani_autos_logged_in");
       localStorage.removeItem("jilani_autos_offline_session");
       localStorage.removeItem("gilani_autos_offline_session");
     }
-  }, [status, session, cleanCallbackUrl]);
+  }, [status]);
 
   // Guarantee direct DOM type attribute update for password input
   useEffect(() => {

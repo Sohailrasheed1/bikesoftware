@@ -57,13 +57,18 @@ export default function RootLayout({
   const isUrdu = savedLang === "ur";
 
   return (
-    <html lang={isUrdu ? "ur" : "ur-Latn"} dir={isUrdu ? "rtl" : "ltr"}>
+    <html
+      lang={isUrdu ? "ur" : "ur-Latn"}
+      dir={isUrdu ? "rtl" : "ltr"}
+      suppressHydrationWarning
+    >
       <head>
         <link rel="manifest" href={getAssetUrl("/manifest.json")} />
       </head>
       <body
-        className={`antialiased font-sans text-slate-900 bg-slate-50 selection:bg-blue-100 selection:text-blue-900 ${
-          isUrdu ? "font-urdu" : ""
+        suppressHydrationWarning
+        className={`antialiased font-sans text-slate-900 bg-slate-50 selection:bg-blue-100 selection:text-blue-900${
+          isUrdu ? " font-urdu" : ""
         }`}
       >
         <AuthProvider>

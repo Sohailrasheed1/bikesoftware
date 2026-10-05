@@ -15,10 +15,21 @@ export function isMongoConfigured(): boolean {
   return Boolean(uri && uri.startsWith("mongodb"));
 }
 
+/** Production must never run on the in-memory store. */
+export function assertMongoConfiguredForProduction(): void {
+  if (process.env.NODE_ENV === "production" && !isMongoConfigured()) {
+    throw new Error(
+      "MONGODB_URI is required in production. In-memory database fallback is disabled."
+    );
+  }
+}
+
 export async function getMongoClient(): Promise<MongoClient> {
   if (!isMongoConfigured()) {
     throw new Error(
-      "MONGODB_URI is not set in .env.local! Please add your MongoDB Atlas connection string."
+      process.env.NODE_ENV === "production"
+        ? "MONGODB_URI is required in production. Set it in your hosting environment variables."
+        : "MONGODB_URI is not set in .env.local! Please add your MongoDB Atlas connection string."
     );
   }
 

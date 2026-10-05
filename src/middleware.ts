@@ -2,10 +2,67 @@ import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+function resolveAuthSecret(): string {
+  const secret = process.env.NEXTAUTH_SECRET?.trim();
+  if (secret) return secret;
+  // Middleware cannot throw on every request in misconfigured prod without locking the site out of /login.
+  // Auth options already hard-fail without NEXTAUTH_SECRET in production.
+  if (process.env.NODE_ENV === "production") {
+    return "";
+  }
+  return "skander_spare_parts_super_secret_jwt_key_2026_xyz";
+}
+
 export async function middleware(req: NextRequest) {
-  const secret = process.env.NEXTAUTH_SECRET;
-  const effectiveSecret = secret || "skander_spare_parts_super_secret_jwt_key_2026_xyz";
-  const token = await getToken({ req, secret: effectiveSecret });
+  const effectiveSecret = resolveAuthSecret();
+
+  // Misconfigured production: block everything except login + public assets/auth
+  if (!effectiveSecret && process.env.NODE_ENV === "production") {
+    const { pathname } = req.nextUrl;
+    const allowWithoutSecret =
+      pathname === "/login" ||
+      pathname.startsWith("/api/auth") ||
+      pathname.startsWith("/_next") ||
+      pathname === "/manifest.json" ||
+      pathname === "/sw.js" ||
+      pathname === "/offline.html" ||
+      pathname === "/robots.txt" ||
+      pathname === "/api/app-version" ||
+      pathname.endsWith(".png") ||
+      pathname.endsWith(".jpg") ||
+      pathname.endsWith(".jpeg") ||
+      pathname.endsWith(".svg") ||
+      pathname.endsWith(".ico") ||
+      pathname.endsWith(".webp");
+
+    if (!allowWithoutSecret) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json(
+          { error: "Server misconfigured: NEXTAUTH_SECRET is required." },
+          { status: 503 }
+        );
+      }
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
+    return NextResponse.next();
+  }
+
+  // Reliably inspect both HTTPS secure cookie and HTTP standard cookie formats on Vercel
+  const hasSecureCookie = req.cookies.has("__Secure-next-auth.session-token");
+  let token = await getToken({
+    req,
+    secret: effectiveSecret,
+    secureCookie: hasSecureCookie,
+  });
+
+  if (!token) {
+    token = await getToken({
+      req,
+      secret: effectiveSecret,
+      secureCookie: !hasSecureCookie,
+    });
+  }
+
   const { pathname, search } = req.nextUrl;
 
   const isLoginPage = pathname === "/login";

@@ -30,8 +30,17 @@ import {
   SEED_JOB_CARDS,
 } from "../storage/seed-data";
 import { daysSince, getLocalDateString } from "../utils";
-import { getDb, isMongoConfigured } from "./mongodb";
+import { getDb, isMongoConfigured, assertMongoConfiguredForProduction } from "./mongodb";
 import { ObjectId } from "mongodb";
+
+/** Block silent in-memory auth/data fallback when live. */
+function denyMemoryInProduction(operation: string): void {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      `Database unavailable (${operation}). Configure a working MONGODB_URI — in-memory fallback is disabled in production.`
+    );
+  }
+}
 
 export const DEFAULT_SHOP_ID = "shop-sikandar";
 
@@ -2349,6 +2358,8 @@ class MongoDBAtlasDatabase {
   // --- USERS & AUTHENTICATION ---
   async getUserByUsernameOrEmail(identifier: string): Promise<DbUser | null> {
     const clean = identifier.toLowerCase().trim();
+    assertMongoConfiguredForProduction();
+
     if (isMongoConfigured()) {
       try {
         const db = await getDb();
@@ -2369,8 +2380,13 @@ class MongoDBAtlasDatabase {
           }
           return u;
         }
+        // User not found in Mongo — do not fall back to seeded memory accounts in production
+        if (process.env.NODE_ENV === "production") {
+          return null;
+        }
       } catch (err) {
         console.error("MongoDB user lookup error:", err);
+        denyMemoryInProduction("getUserByUsernameOrEmail");
       }
     }
 
@@ -2404,15 +2420,39 @@ class MongoDBAtlasDatabase {
     try {
       const db = await getDb();
       const count = await db.collection("users").countDocuments();
+      const isProd = process.env.NODE_ENV === "production";
+      const superPass = process.env.SUPERADMIN_INITIAL_PASSWORD;
+      const adminPass = process.env.ADMIN_INITIAL_PASSWORD;
+
       if (count === 0) {
+        // Never seed known demo passwords (admin123 / superadmin123) into a live DB
+        if (isProd) {
+          if (!superPass || superPass.length < 8) {
+            throw new Error(
+              "SUPERADMIN_INITIAL_PASSWORD (min 8 chars) is required for first production database seed."
+            );
+          }
+          if (!adminPass || adminPass.length < 8) {
+            throw new Error(
+              "ADMIN_INITIAL_PASSWORD (min 8 chars) is required for first production database seed."
+            );
+          }
+        }
+
+        const seedSource = isProd
+          ? INITIAL_SEEDED_USERS.filter(
+              (u) => u.role === "superadmin" || u.username === "admin"
+            )
+          : INITIAL_SEEDED_USERS;
+
         const usersToSeed = await Promise.all(
-          INITIAL_SEEDED_USERS.map(async (u) => {
-            if (u.role === "superadmin" && process.env.SUPERADMIN_INITIAL_PASSWORD && process.env.SUPERADMIN_INITIAL_PASSWORD.length >= 8) {
-              const hash = await bcrypt.hash(process.env.SUPERADMIN_INITIAL_PASSWORD, 10);
+          seedSource.map(async (u) => {
+            if (u.role === "superadmin" && superPass && superPass.length >= 8) {
+              const hash = await bcrypt.hash(superPass, 10);
               return { ...u, passwordHash: hash };
             }
-            if (u.username === "admin" && process.env.ADMIN_INITIAL_PASSWORD && process.env.ADMIN_INITIAL_PASSWORD.length >= 8) {
-              const hash = await bcrypt.hash(process.env.ADMIN_INITIAL_PASSWORD, 10);
+            if (u.username === "admin" && adminPass && adminPass.length >= 8) {
+              const hash = await bcrypt.hash(adminPass, 10);
               return { ...u, passwordHash: hash };
             }
             return u;
@@ -2425,9 +2465,14 @@ class MongoDBAtlasDatabase {
         if (!superAdminExists) {
           const superAdminSeed = INITIAL_SEEDED_USERS.find((u) => u.role === "superadmin");
           if (superAdminSeed) {
+            if (isProd && (!superPass || superPass.length < 8)) {
+              throw new Error(
+                "SUPERADMIN_INITIAL_PASSWORD (min 8 chars) is required to create the missing superadmin in production."
+              );
+            }
             let seedToInsert = { ...superAdminSeed };
-            if (process.env.SUPERADMIN_INITIAL_PASSWORD && process.env.SUPERADMIN_INITIAL_PASSWORD.length >= 8) {
-              seedToInsert.passwordHash = await bcrypt.hash(process.env.SUPERADMIN_INITIAL_PASSWORD, 10);
+            if (superPass && superPass.length >= 8) {
+              seedToInsert.passwordHash = await bcrypt.hash(superPass, 10);
             }
             await db.collection("users").insertOne(seedToInsert as any);
           }
@@ -2440,9 +2485,14 @@ class MongoDBAtlasDatabase {
         if (!primaryAdminExists) {
           const adminSeed = INITIAL_SEEDED_USERS.find((u) => u.username === "admin");
           if (adminSeed) {
+            if (isProd && (!adminPass || adminPass.length < 8)) {
+              throw new Error(
+                "ADMIN_INITIAL_PASSWORD (min 8 chars) is required to create the missing shop admin in production."
+              );
+            }
             let seedToInsert = { ...adminSeed };
-            if (process.env.ADMIN_INITIAL_PASSWORD && process.env.ADMIN_INITIAL_PASSWORD.length >= 8) {
-              seedToInsert.passwordHash = await bcrypt.hash(process.env.ADMIN_INITIAL_PASSWORD, 10);
+            if (adminPass && adminPass.length >= 8) {
+              seedToInsert.passwordHash = await bcrypt.hash(adminPass, 10);
             }
             await db.collection("users").insertOne(seedToInsert as any);
           }

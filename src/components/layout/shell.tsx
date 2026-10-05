@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React from "react";
 import { Navbar } from "./navbar";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -10,28 +10,10 @@ import { RouteGuard } from "./module-guard";
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const { data: session, status } = useSession();
+  const { data: session } = useSession();
 
   const isLoginPage = pathname === "/login";
   const isSuperAdmin = pathname.startsWith("/super-admin");
-
-  // If unauthenticated and on a protected page, purge stale storage and redirect to login
-  useEffect(() => {
-    if (!isLoginPage && status === "unauthenticated") {
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("jilani_autos_logged_in");
-        localStorage.removeItem("gilani_autos_logged_in");
-        localStorage.removeItem("jilani_autos_offline_session");
-        localStorage.removeItem("gilani_autos_offline_session");
-      }
-      const redirectUrl =
-        pathname && pathname !== "/"
-          ? `/login?callbackUrl=${encodeURIComponent(pathname)}`
-          : "/login";
-      router.replace(redirectUrl);
-    }
-  }, [status, isLoginPage, pathname, router]);
 
   // If on login page, render full screen without navbar
   if (isLoginPage) {
