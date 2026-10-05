@@ -623,10 +623,20 @@ export default function InventoryPage() {
                       </td>
 
                       <td className="py-3.5 px-3 text-right font-black text-slate-900">
-                        <div>{formatPKR(part.sellingPrice)}</div>
-                        <div className="text-[10px] text-emerald-600 font-semibold">
-                          +{formatPKR(margin)} munafa
-                        </div>
+                        {part.sellingPrice > 0 ? (
+                          <>
+                            <div>{formatPKR(part.sellingPrice)}</div>
+                            <div className="text-[10px] text-emerald-600 font-semibold">
+                              +{formatPKR(margin)} munafa
+                            </div>
+                          </>
+                        ) : (
+                          <div>
+                            <span className="inline-block px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black">
+                              {isUrdu ? "بیچتے وقت طے ہوگا" : "Open Rate (Bikri Waqt)"}
+                            </span>
+                          </div>
+                        )}
                       </td>
 
                       <td className="py-3.5 px-3 text-center">
@@ -862,17 +872,23 @@ export default function InventoryPage() {
               placeholder="0"
             />
 
-            <Input
-              label="Bikri Qeemat (Sale Price PKR) *"
-              type="number"
-              required
-              min="0"
-              value={formData.sellingPrice === 0 ? "" : formData.sellingPrice}
-              onChange={(e) =>
-                setFormData({ ...formData, sellingPrice: Number(e.target.value) || 0 })
-              }
-              placeholder="0"
-            />
+            <div>
+              <Input
+                label={isUrdu ? "فروخت ریٹ (Bikri Price - اختیاری)" : "Bikri Qeemat (Sale Price - Optional)"}
+                type="number"
+                min="0"
+                value={formData.sellingPrice === 0 ? "" : formData.sellingPrice}
+                onChange={(e) =>
+                  setFormData({ ...formData, sellingPrice: Number(e.target.value) || 0 })
+                }
+                placeholder="0 (Khali chorr sakte hain)"
+              />
+              <p className="text-[10px] text-slate-500 mt-1 leading-tight">
+                {isUrdu
+                  ? "اگر ابھی طے نہیں تو خالی چھوڑ دیں، کسٹمر کو بیچتے وقت درج کر لیں گے۔"
+                  : "Khali chorr sakte hain, bechte waqt rate darj kar sakein ge."}
+              </p>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3.5">
@@ -992,14 +1008,14 @@ export default function InventoryPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <Input
-              label="Nayi Bikri Qeemat / Selling Price (Rs) *"
+              label={isUrdu ? "نئی فروخت قیمت (اختیاری)" : "Nayi Bikri Qeemat (Optional)"}
               type="number"
-              required
               min="0"
-              value={batchForm.sellingPrice}
+              value={batchForm.sellingPrice === 0 ? "" : batchForm.sellingPrice}
               onChange={(e) =>
                 setBatchForm({ ...batchForm, sellingPrice: Number(e.target.value) || 0 })
               }
+              placeholder="0 (Khali chorr sakte hain)"
             />
 
             <Input

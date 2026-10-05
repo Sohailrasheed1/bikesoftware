@@ -18,7 +18,9 @@ import {
   Receipt,
   User,
   Edit,
+  Lock,
 } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -28,6 +30,7 @@ import { useStore } from "@/lib/storage/context";
 import { useLanguage } from "@/lib/i18n/context";
 import { SupplierCredit } from "@/types";
 import { formatPKR, formatDate, daysSince } from "@/lib/utils";
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 
 export default function SupplierCreditPage() {
   const {
@@ -38,9 +41,49 @@ export default function SupplierCreditPage() {
     deleteSupplierCredit,
   } = useStore();
   const { t, isUrdu } = useLanguage();
+  const { canAccessModule, isLoading } = useCurrentUser();
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"All" | "Pending" | "Paid">("All");
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 rounded-full border-3 border-slate-200 border-t-blue-600 animate-spin" />
+          <span className="text-xs font-bold text-slate-400">Loading supplier khata...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!canAccessModule("suppliers")) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xl text-center space-y-4">
+          <div className="h-16 w-16 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
+            <Lock className="h-8 w-8" />
+          </div>
+          <h2 className="text-xl font-black text-slate-900">
+            {isUrdu ? "رسائی محدود ہے (Access Restricted)" : "Access Restricted"}
+          </h2>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            {isUrdu
+              ? "آپ کے اکاؤنٹ کو سپلائر کا ادھار کھاتہ دیکھنے کی اجازت نہیں دی گئی ہے۔ دکان کے مالک سے رابطہ کریں۔"
+              : "Aapke account ko Supplier Udhaar dekhne ki ijazat nahi hai. Malik (Admin) se rabta karein."}
+          </p>
+          <div className="pt-2">
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition"
+            >
+              {isUrdu ? "واپس ڈیش بورڈ پر جائیں" : "Back to Dashboard"}
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // New Credit Modal
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);

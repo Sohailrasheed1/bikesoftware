@@ -32,7 +32,7 @@ import { ReceiptModal } from "@/components/pos/receipt-modal";
 import { useStore } from "@/lib/storage/context";
 import { useLanguage } from "@/lib/i18n/context";
 import { Part, Customer, Bill, BillItem, BillLabourItem } from "@/types";
-import { formatPKR, formatCompatibleModels, toModelArray } from "@/lib/utils";
+import { formatPKR, formatCompatibleModels, toModelArray, cn } from "@/lib/utils";
 
 export default function BillingPage() {
   const { parts, customers, mechanics, createBill, addCustomer } = useStore();
@@ -164,6 +164,19 @@ export default function BillingPage() {
     setCart(updated);
   };
 
+  // Update Cart Item Unit Price (for open rate / customer customized pricing)
+  const handleUpdateUnitPrice = (partId: string, newPrice: number) => {
+    setErrorMessage("");
+    const existingIndex = cart.findIndex((item) => item.partId === partId);
+    if (existingIndex === -1) return;
+
+    const validPrice = Math.max(0, newPrice);
+    const updated = [...cart];
+    updated[existingIndex].unitPrice = validPrice;
+    updated[existingIndex].totalPrice = updated[existingIndex].quantity * validPrice;
+    setCart(updated);
+  };
+
   // Remove Item
   const handleRemoveItem = (partId: string) => {
     setCart(cart.filter((item) => item.partId !== partId));
@@ -221,6 +234,17 @@ export default function BillingPage() {
     setErrorMessage("");
     if (cart.length === 0 && labourCart.length === 0) {
       setErrorMessage("Khaali bill save nahi ho sakta! Baraye meharbani pehle saman ya labour add karein.");
+      return;
+    }
+
+    // Check if any cart item has 0 price
+    const zeroPriceItem = cart.find((i) => i.unitPrice === 0);
+    if (zeroPriceItem) {
+      setErrorMessage(
+        isUrdu
+          ? `آئٹم "${zeroPriceItem.partName}" کا ریٹ 0 ہے۔ برائے مہربانی بل میں اس کا ریٹ درج کریں۔`
+          : `Item "${zeroPriceItem.partName}" ka sale rate 0 hai. Barah-e-karam cart mein iska rate darj karein.`
+      );
       return;
     }
 
@@ -622,10 +646,16 @@ export default function BillingPage() {
                     <div className="flex items-center gap-3 flex-shrink-0">
                       <div className="text-right">
                         <div className="font-black text-sm sm:text-base text-slate-900 leading-tight">
-                          {formatPKR(part.sellingPrice)}
+                          {part.sellingPrice > 0 ? (
+                            formatPKR(part.sellingPrice)
+                          ) : (
+                            <span className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded text-[11px] font-black border border-amber-200">
+                              {isUrdu ? "کسٹمر ریٹ" : "Open Rate"}
+                            </span>
+                          )}
                         </div>
                         <div className="text-[10px] text-slate-400 font-medium">
-                          {isUrdu ? "فی عدد" : "fee nag"}
+                          {part.sellingPrice > 0 ? (isUrdu ? "فی عدد" : "fee nag") : (isUrdu ? "بل میں طے کریں" : "Set in bill")}
                         </div>
                       </div>
 
@@ -726,8 +756,29 @@ export default function BillingPage() {
                           <div className="font-extrabold text-xs text-slate-900 truncate" title={item.partName}>
                             {item.partName}
                           </div>
-                          <div className="text-[10px] text-slate-500">
-                            {formatPKR(item.unitPrice)} {isUrdu ? "فی عدد" : "fee nag"}
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <span className="text-[10px] text-slate-500 font-bold">Rate:</span>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                min="0"
+                                value={item.unitPrice === 0 ? "" : item.unitPrice}
+                                onChange={(e) => handleUpdateUnitPrice(item.partId, Number(e.target.value) || 0)}
+                                placeholder="0"
+                                className={cn(
+                                  "w-20 px-2 py-0.5 text-xs font-black rounded-lg border text-right focus:outline-none focus:ring-1",
+                                  item.unitPrice === 0
+                                    ? "bg-amber-50 border-amber-400 text-amber-900 ring-2 ring-amber-300 animate-pulse"
+                                    : "bg-slate-50 border-slate-200 text-slate-900 focus:ring-blue-500"
+                                )}
+                              />
+                            </div>
+                            <span className="text-[10px] text-slate-400">PKR</span>
+                            {item.unitPrice === 0 && (
+                              <span className="text-[9px] font-black bg-amber-100 text-amber-800 px-1 py-0.5 rounded">
+                                {isUrdu ? "ریٹ درج کریں" : "Enter Rate"}
+                              </span>
+                            )}
                           </div>
                         </div>
 

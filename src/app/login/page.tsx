@@ -34,35 +34,21 @@ function LoginForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // If already authenticated (online or offline session), redirect immediately away from login
+  // If already authenticated via official session, redirect immediately away from login
   useEffect(() => {
-    const hasOfflineSession =
-      typeof window !== "undefined" &&
-      (localStorage.getItem("jilani_autos_logged_in") === "true" ||
-        localStorage.getItem("gilani_autos_logged_in") === "true" ||
-        !!localStorage.getItem("jilani_autos_offline_session") ||
-        !!localStorage.getItem("gilani_autos_offline_session"));
-
-    if (status === "authenticated" || hasOfflineSession) {
-      let isSuper = false;
-      if (session?.user) {
-        isSuper = (session.user as any)?.role === "superadmin";
-      } else if (typeof window !== "undefined") {
-        try {
-          const offUser = JSON.parse(
-            localStorage.getItem("jilani_autos_offline_session") ||
-            localStorage.getItem("gilani_autos_offline_session") ||
-            "{}"
-          );
-          isSuper = offUser.role === "superadmin";
-        } catch {}
-      }
-
+    if (status === "authenticated" && session?.user) {
+      const isSuper = (session.user as any)?.role === "superadmin";
       if (isSuper) {
         window.location.href = "/super-admin";
       } else {
         router.replace(callbackUrl);
       }
+    } else if (status === "unauthenticated" && typeof window !== "undefined") {
+      // Purge any stale unverified offline keys to prevent unauthorized bypass
+      localStorage.removeItem("jilani_autos_logged_in");
+      localStorage.removeItem("gilani_autos_logged_in");
+      localStorage.removeItem("jilani_autos_offline_session");
+      localStorage.removeItem("gilani_autos_offline_session");
     }
   }, [status, session, router, callbackUrl]);
 
@@ -73,57 +59,6 @@ function LoginForm() {
       el.type = showPassword ? "text" : "password";
     }
   }, [showPassword]);
-
-  // Helper function to handle offline login
-  const handleOfflineLogin = (u: string, p: string): boolean => {
-    const lowerU = u.toLowerCase().trim();
-    let isMatched = false;
-    let role = "admin";
-    let shopName = "Jilani Autos";
-
-    if (lowerU === "admin" && (p === "admin123" || p === "admin")) isMatched = true;
-    if (lowerU === "staff" && (p === "staff123" || p === "staff")) { isMatched = true; role = "staff"; }
-    if (lowerU === "sohail" && (p === "sohail123" || p === "sohail" || p === "admin123")) isMatched = true;
-    if (lowerU === "superadmin" && (p === "superadmin123" || p === "admin123" || p === "superadmin" || p === "sohail123")) {
-      isMatched = true;
-      role = "superadmin";
-      shopName = "Platform Super Admin";
-    }
-
-    if (!isMatched) {
-      // Check cached session
-      try {
-        const cachedUser = JSON.parse(localStorage.getItem("jilani_autos_offline_session") || "{}");
-        if (cachedUser.name && cachedUser.name.toLowerCase() === lowerU) {
-          isMatched = true;
-          role = cachedUser.role || "admin";
-          shopName = cachedUser.shopName || "Jilani Autos";
-        }
-      } catch {}
-    }
-
-    if (isMatched) {
-      const offlineUser = { id: `off-${lowerU}`, name: u, role, shopName };
-      localStorage.setItem("jilani_autos_logged_in", "true");
-      localStorage.setItem("jilani_autos_offline_session", JSON.stringify(offlineUser));
-
-      toast.success(
-        isUrdu ? "آف لائن لاگ ان کامیاب! 📶" : "Offline Login Successful! 📶",
-        isUrdu ? "سافٹ ویئر کا ڈیش بورڈ آف لائن کھولا جا رہا ہے..." : "Entering software dashboard in offline mode..."
-      );
-
-      setTimeout(() => {
-        if (role === "superadmin") {
-          window.location.href = "/super-admin";
-        } else {
-          window.location.href = callbackUrl || "/";
-        }
-      }, 400);
-      return true;
-    }
-
-    return false;
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -139,21 +74,17 @@ function LoginForm() {
       return;
     }
 
-    setLoading(true);
-
-    // If device is offline, attempt offline login immediately
+    // Require active network connection for secure login
     if (typeof navigator !== "undefined" && !navigator.onLine) {
-      const success = handleOfflineLogin(cleanUsername, password);
-      if (!success) {
-        const errorMsg = isUrdu
-          ? "آف لائن موڈ: صارف کا نام یا پاس ورڈ غلط ہے۔"
-          : "Offline Mode: Username ya Password ghalat hai.";
-        setError(errorMsg);
-        toast.error(isUrdu ? "لاگ ان ناکام" : "Login Failed", errorMsg);
-      }
-      setLoading(false);
+      const offlineMsg = isUrdu
+        ? "انٹرنیٹ کنکشن دستیاب نہیں ہے۔ محفوظ لاگ ان کے لیے انٹرنیٹ ضروری ہے۔"
+        : "Internet connection darj nahi hai. Mehfooz login ke liye online hona zaroori hai.";
+      setError(offlineMsg);
+      toast.error(isUrdu ? "کنکشن کی خرابی" : "No Internet Connection", offlineMsg);
       return;
     }
+
+    setLoading(true);
 
     try {
       const res = await signIn("credentials", {
@@ -163,26 +94,18 @@ function LoginForm() {
       });
 
       if (res?.error) {
-        // Fallback to offline login if credentials / network check fails
-        const success = handleOfflineLogin(cleanUsername, password);
-        if (!success) {
-          const errorMsg =
-            res.error === "CredentialsSignin"
-              ? isUrdu
-                ? "صارف کا نام یا پاس ورڈ غلط ہے۔ براہ کرم دوبارہ چیک کریں۔"
-                : "Username ya Password ghalat hai. Baraye meharbani dobara check karein."
-              : res.error;
+        const errorMsg =
+          res.error === "CredentialsSignin"
+            ? isUrdu
+              ? "صارف کا نام یا پاس ورڈ غلط ہے۔ براہ کرم دوبارہ چیک کریں۔"
+              : "Username ya Password ghalat hai. Baraye meharbani dobara check karein."
+            : res.error;
 
-          setError(errorMsg);
-          toast.error(isUrdu ? "لاگ ان ناکام رہا" : "Login Failed", errorMsg);
-        }
+        setError(errorMsg);
+        toast.error(isUrdu ? "لاگ ان ناکام رہا" : "Login Failed", errorMsg);
       } else {
-        // Save session locally for offline fallback
-        let isSuper =
-          cleanUsername.toLowerCase() === "superadmin" ||
-          cleanUsername.toLowerCase() === "sohail" ||
-          cleanUsername.toLowerCase() === "sohailtest799@gmail.com";
-
+        // Authenticated successfully via NextAuth
+        let isSuper = false;
         try {
           const sessionRes = await fetch("/api/auth/session", { cache: "no-store" });
           const sessionData = await sessionRes.json();
@@ -193,16 +116,6 @@ function LoginForm() {
           console.error("Session fetch error:", e);
         }
 
-        localStorage.setItem("jilani_autos_logged_in", "true");
-        localStorage.setItem(
-          "jilani_autos_offline_session",
-          JSON.stringify({
-            name: cleanUsername,
-            role: isSuper ? "superadmin" : "admin",
-            shopName: isSuper ? "Platform Super Admin" : "Jilani Autos",
-          })
-        );
-
         if (isSuper) {
           toast.success(
             "Super Admin Khush Amdeed! 👑",
@@ -210,7 +123,7 @@ function LoginForm() {
           );
           setTimeout(() => {
             window.location.href = "/super-admin";
-          }, 400);
+          }, 350);
         } else {
           toast.success(
             isUrdu ? "لاگ ان کامیاب!" : "Login Successful!",
@@ -218,19 +131,15 @@ function LoginForm() {
           );
           setTimeout(() => {
             window.location.href = callbackUrl || "/";
-          }, 400);
+          }, 350);
         }
       }
     } catch (err: any) {
-      // If network exception occurs during signIn fetch, fallback to offline login
-      const success = handleOfflineLogin(cleanUsername, password);
-      if (!success) {
-        const errMsg =
-          err?.message ||
-          (isUrdu ? "لاگ ان کرنے میں مسئلہ پیش آیا۔" : "Login karne mein masla aaya.");
-        setError(errMsg);
-        toast.error(isUrdu ? "سسٹم کی خرابی" : "System Error", errMsg);
-      }
+      const errMsg =
+        err?.message ||
+        (isUrdu ? "لاگ ان کرنے میں مسئلہ پیش آیا۔" : "Login karne mein masla aaya.");
+      setError(errMsg);
+      toast.error(isUrdu ? "سسٹم کی خرابی" : "System Error", errMsg);
     } finally {
       setLoading(false);
     }
@@ -334,7 +243,7 @@ function LoginForm() {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder={isUrdu ? "صارف کا نام لکھیں..." : "superadmin ya admin..."}
+              placeholder={isUrdu ? "اپنا یوزر نیم لکھیں..." : "admin ya staff username..."}
               autoComplete="username"
               required
               className="flex h-11 w-full rounded-xl border border-slate-200/90 bg-white/90 pl-10 pr-3.5 py-2 text-sm text-slate-900 placeholder:text-slate-400 shadow-2xs transition-all focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-100"

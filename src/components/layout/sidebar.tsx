@@ -23,6 +23,7 @@ import { useStore } from "@/lib/storage/context";
 import { useLanguage } from "@/lib/i18n/context";
 import { useSession, signOut } from "next-auth/react";
 import { getAssetUrl } from "@/lib/version";
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 
 interface SidebarProps {
   onCloseMobile?: () => void;
@@ -33,6 +34,7 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
   const { stats } = useStore();
   const { t, isUrdu } = useLanguage();
   const { data: session } = useSession();
+  const { user: currentUser, isStaff, isLoading: isAuthLoading, canAccessModule } = useCurrentUser();
 
   const navigation = [
     {
@@ -40,6 +42,7 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
       sub: isUrdu ? "Dashboard Overview" : "خلاصہ و اعداد و شمار",
       href: "/",
       icon: LayoutDashboard,
+      visible: true,
     },
     {
       name: isUrdu ? "ورکشاپ لائیو بے" : "Live Workshop Bay",
@@ -49,12 +52,14 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
       highlight: true,
       badge: stats.activeJobsCount > 0 ? `${stats.activeJobsCount} Live` : undefined,
       badgeVariant: "success",
+      visible: canAccessModule("workshop"),
     },
     {
       name: isUrdu ? "نیا بل بنائیں" : "Naya Bill Banayein",
       sub: isUrdu ? "فاسٹ پوائنٹ آف سیل" : "Fast POS & Billing",
       href: "/billing",
       icon: Receipt,
+      visible: canAccessModule("pos"),
     },
     {
       name: isUrdu ? "میکینک اور لیبر" : "Mechanics & Labour",
@@ -63,6 +68,7 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
       icon: Users,
       badge: stats.totalMechanicPayable > 0 ? formatPKR(stats.totalMechanicPayable) : undefined,
       badgeVariant: "warning",
+      visible: canAccessModule("mechanics"),
     },
     {
       name: isUrdu ? "سامان اور اسٹاک" : "Saman & Stock",
@@ -71,18 +77,21 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
       icon: Boxes,
       badge: stats.lowStockCount > 0 ? `${stats.lowStockCount} ${isUrdu ? "کم" : "Kam"}` : undefined,
       badgeVariant: "warning",
+      visible: canAccessModule("inventory"),
     },
     {
       name: isUrdu ? "گاہکوں کا ریکارڈ" : "Gahak Record",
       sub: isUrdu ? "گاہک ڈائریکٹری و ہسٹری" : "Customer History & Khata",
       href: "/customers",
       icon: UserCheck,
+      visible: canAccessModule("customers"),
     },
     {
       name: isUrdu ? "پرانے بلز و رسیدیں" : "Purane Bills",
       sub: isUrdu ? "سابقہ انوائسز اور پرنٹس" : "Bill History & Invoices",
       href: "/bills",
       icon: History,
+      visible: canAccessModule("bills"),
     },
     {
       name: isUrdu ? "سپلائر کا ادھار" : "Supplier Udhaar",
@@ -91,14 +100,16 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
       icon: WalletCards,
       badge: stats.overdue15DaysCreditCount > 0 ? `${stats.overdue15DaysCreditCount} Due` : undefined,
       badgeVariant: "danger",
+      visible: canAccessModule("suppliers"),
     },
     {
       name: isUrdu ? "منافع اور رپورٹس" : "Munafa & Reports",
       sub: isUrdu ? "بکری اور خالص منافع" : "Sales & Profit Analytics",
       href: "/reports",
       icon: BarChart3,
+      visible: canAccessModule("reports"),
     },
-  ];
+  ].filter((item) => item.visible);
 
   return (
     <aside className="w-72 flex-shrink-0 flex flex-col h-full glass-sidebar border-r border-slate-200/80 bg-white">
@@ -182,7 +193,7 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
       </div>
 
       {/* Overdue Alert Strip if exists */}
-      {stats.overdue15DaysCreditCount > 0 && (
+      {stats.overdue15DaysCreditCount > 0 && canAccessModule("suppliers") && (
         <div className="mx-3 mb-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-2">
           <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
           <div className="text-[11px] text-amber-900 leading-tight">
@@ -200,25 +211,35 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
       {/* User / Session Footer */}
       <div className="p-4 border-t border-slate-200/80 bg-white/50 backdrop-blur-sm">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 font-bold text-xs">
-              <ShieldCheck className="h-4 w-4 text-blue-600" />
-            </div>
-            <div>
-              <div className="text-xs font-bold text-slate-800 leading-tight">
-                {session?.user?.name || "Jilani Autos (Admin)"}
-              </div>
-              <div className="text-[11px] text-slate-500 font-medium">
-                {(session?.user as any)?.role === "staff"
-                  ? isUrdu
-                    ? "کاؤنٹر اسٹاف"
-                    : "Counter Staff"
-                  : isUrdu
-                  ? "دکان کا مالک / ایڈمن"
-                  : "Shop Admin / Malik"}
+          {isAuthLoading && !currentUser ? (
+            <div className="flex items-center gap-2.5 animate-pulse">
+              <div className="h-9 w-9 rounded-xl bg-slate-200" />
+              <div className="space-y-1">
+                <div className="w-24 h-3 bg-slate-200 rounded" />
+                <div className="w-16 h-2.5 bg-slate-200 rounded" />
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 font-bold text-xs">
+                <ShieldCheck className="h-4 w-4 text-blue-600" />
+              </div>
+              <div>
+                <div className="text-xs font-bold text-slate-800 leading-tight">
+                  {currentUser?.name || (isStaff ? "Shop Assistant" : "Jilani Autos")}
+                </div>
+                <div className="text-[11px] text-slate-500 font-medium">
+                  {isStaff
+                    ? isUrdu
+                      ? "کاؤنٹر اسٹاف"
+                      : "Counter Staff"
+                    : isUrdu
+                    ? "دکان کا مالک / ایڈمن"
+                    : "Shop Admin / Malik"}
+                </div>
+              </div>
+            </div>
+          )}
           <button
             onClick={async () => {
               if (typeof window !== "undefined") {

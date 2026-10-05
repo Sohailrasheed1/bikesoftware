@@ -16,6 +16,9 @@ import {
   SaleDetail,
   StockAdjustment,
   RateHistoryEntry,
+  UserPermissions,
+  DEFAULT_ADMIN_PERMISSIONS,
+  DEFAULT_STAFF_PERMISSIONS,
 } from "@/types";
 import {
   SEED_PARTS,
@@ -28,6 +31,7 @@ import {
 } from "../storage/seed-data";
 import { daysSince, getLocalDateString } from "../utils";
 import { getDb, isMongoConfigured } from "./mongodb";
+import { ObjectId } from "mongodb";
 
 export const DEFAULT_SHOP_ID = "shop-sikandar";
 
@@ -60,8 +64,9 @@ export const INITIAL_SEEDED_USERS: DbUser[] = [
     username: "superadmin",
     email: "superadmin@bikesoftware.pk",
     name: "Platform Super Admin (SaaS Owner)",
-    passwordHash: "$2b$10$OFJLNjQsRoOVzXG5470vmevVYsx0Mf7c9sXAn7H/cyVPDwB0sR8Me", // "superadmin123"
+    passwordHash: "$2b$10$OFJLNjQsRoOVzXG5470vmevVYsx0Mf7c9sXAn7H/cyVPDwB0sR8Me",
     role: "superadmin",
+    permissions: DEFAULT_ADMIN_PERMISSIONS,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
   },
@@ -70,8 +75,9 @@ export const INITIAL_SEEDED_USERS: DbUser[] = [
     username: "admin",
     email: "admin@jilaniautos.pk",
     name: "Jilani Autos (Owner / Admin)",
-    passwordHash: "$2b$10$/TdBaVILa4hlavuMZ7KszOzQjqOoP6UTWYiFHnIgoZCK73eSePstO", // "admin123"
+    passwordHash: "$2b$10$/TdBaVILa4hlavuMZ7KszOzQjqOoP6UTWYiFHnIgoZCK73eSePstO",
     role: "admin",
+    permissions: DEFAULT_ADMIN_PERMISSIONS,
     shopId: DEFAULT_SHOP_ID,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
@@ -81,8 +87,9 @@ export const INITIAL_SEEDED_USERS: DbUser[] = [
     username: "staff",
     email: "staff@jilaniautos.pk",
     name: "Shop Assistant",
-    passwordHash: "$2b$10$B5DC9cIhM7CFDD9ctNp4heu1I0VI8JJztHHYM.n0yYu8reys9BtcG", // "staff123"
+    passwordHash: "$2b$10$B5DC9cIhM7CFDD9ctNp4heu1I0VI8JJztHHYM.n0yYu8reys9BtcG",
     role: "staff",
+    permissions: DEFAULT_STAFF_PERMISSIONS,
     shopId: DEFAULT_SHOP_ID,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
@@ -92,8 +99,9 @@ export const INITIAL_SEEDED_USERS: DbUser[] = [
     username: "sohail",
     email: "sohail@jilaniautos.pk",
     name: "Sohail Rasheed (Manager)",
-    passwordHash: "$2b$10$5E36laiLZB1TvhjGpqwKKek2Y3kvKBDN0N3Lq1E/VAm0.ZJSgEEem", // "sohail123"
+    passwordHash: "$2b$10$5E36laiLZB1TvhjGpqwKKek2Y3kvKBDN0N3Lq1E/VAm0.ZJSgEEem",
     role: "admin",
+    permissions: DEFAULT_ADMIN_PERMISSIONS,
     shopId: DEFAULT_SHOP_ID,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
@@ -181,6 +189,9 @@ class MongoDBAtlasDatabase {
     seedSampleParts: boolean = true
   ): Promise<{ shop: Shop; user: DbUser }> {
     const cleanUsername = adminUser.username.toLowerCase().trim();
+    if (!adminUser.password || typeof adminUser.password !== "string" || adminUser.password.length < 8) {
+      throw new Error("Password kam az kam 8 characters ka hona chahiye.");
+    }
     const existingUser = await this.getUserByUsernameOrEmail(cleanUsername);
     if (existingUser) {
       throw new Error(`Username "${cleanUsername}" is already taken. Please choose another.`);
@@ -274,6 +285,9 @@ class MongoDBAtlasDatabase {
   }
 
   async resetShopAdminPassword(shopId: string, newPassword: string): Promise<boolean> {
+    if (!newPassword || typeof newPassword !== "string" || newPassword.length < 8) {
+      throw new Error("Password kam az kam 8 characters ka hona chahiye.");
+    }
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(newPassword, salt);
     const updatedAt = new Date().toISOString();
@@ -326,25 +340,377 @@ class MongoDBAtlasDatabase {
     return true;
   }
 
-  async getUsersByShop(shopId: string): Promise<DbUser[]> {
+  async getUsersByShop(shopId: string): Promise<Omit<DbUser, "passwordHash">[]> {
     if (isMongoConfigured()) {
       const db = await getDb();
-      const users = await db.collection<DbUser>("users").find({ shopId }).toArray();
-      return users.map(({ _id, passwordHash, ...rest }: any) => rest as DbUser);
+      await this.ensureInitialUsers();
+      // CRITICAL: Superadmin is a platform account and must NEVER be returned as a shop user!
+      const shopFilter = getShopFilter(shopId);
+      const users = await db
+        .collection<DbUser>("users")
+        .find({
+          $and: [shopFilter, { role: { $ne: "superadmin" } }],
+        })
+        .toArray();
+      return users.map(({ _id, passwordHash, ...rest }: any) => {
+        const u = {
+          ...rest,
+          id: rest.id || _id?.toString() || rest.username,
+        } as DbUser;
+        if (!u.permissions) {
+          u.permissions = u.role === "admin" ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_STAFF_PERMISSIONS;
+        }
+        return u;
+      });
     }
     return memoryStore.users
-      .filter((u) => u.shopId === shopId)
-      .map(({ passwordHash, ...u }) => u as any);
+      .filter((u) => u.role !== "superadmin" && matchesShop(u.shopId, shopId))
+      .map(({ passwordHash, ...u }) => {
+        if (!u.permissions) {
+          u.permissions = u.role === "admin" ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_STAFF_PERMISSIONS;
+        }
+        return u as any;
+      });
   }
 
-  async deleteUser(userId: string): Promise<boolean> {
+  async createUserForShop(
+    data: {
+      username: string;
+      email?: string;
+      name: string;
+      password: string;
+      role: "admin" | "staff" | "superadmin";
+      permissions?: UserPermissions;
+    },
+    shopId: string,
+    isSuperAdmin: boolean = false
+  ): Promise<Omit<DbUser, "passwordHash">> {
+    const cleanUsername = data.username.toLowerCase().trim();
+    if (!cleanUsername) throw new Error("Username darj karna zaroori hai.");
+
+    // Strict Super Admin Protection: Nobody can EVER create a superadmin user or take the superadmin username
+    if (data.role === "superadmin" || cleanUsername === "superadmin") {
+      throw new Error("Access denied. Shop admin superadmin ya unauthorized role assign nahi kar sakta.");
+    }
+    if (!["admin", "staff"].includes(data.role)) {
+      throw new Error("Access denied. Ghair tasdeeq shuda role assign nahi kiya ja sakta.");
+    }
+
+    if (!data.password || typeof data.password !== "string" || data.password.length < 8) {
+      throw new Error("Password kam az kam 8 characters ka hona chahiye.");
+    }
+    if (!data.name.trim()) throw new Error("Staff / User ka naam darj karein.");
+
+    // Check uniqueness
+    const existing = await this.getUserByUsernameOrEmail(cleanUsername);
+    if (existing) {
+      throw new Error(`"${cleanUsername}" username pehle se istemal mein hai. Koi mukhtalif username chunein.`);
+    }
+
+    const passwordHash = await bcrypt.hash(data.password, 10);
+    const permissions: UserPermissions = data.permissions || (
+      data.role === "admin" ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_STAFF_PERMISSIONS
+    );
+
+    const newUser: DbUser = {
+      id: `user-${Date.now()}`,
+      username: cleanUsername,
+      email: data.email?.trim() || `${cleanUsername}@jilaniautos.pk`,
+      name: data.name.trim(),
+      passwordHash,
+      role: data.role,
+      permissions,
+      shopId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
     if (isMongoConfigured()) {
       const db = await getDb();
-      await db.collection("users").deleteOne({ id: userId });
+      await db.collection("users").insertOne(newUser as any);
+    }
+    memoryStore.users.push(newUser);
+
+    const { passwordHash: _, ...sanitized } = newUser;
+    return sanitized;
+  }
+
+  async getUserForShop(userId: string, shopId: string, isSuperAdmin: boolean = false): Promise<DbUser | null> {
+    const cleanId = String(userId).trim();
+    if (isMongoConfigured()) {
+      const db = await getDb();
+      const idConditions: any[] = [
+        { id: cleanId },
+        { username: cleanId.toLowerCase() },
+      ];
+      if (ObjectId.isValid(cleanId)) {
+        try {
+          idConditions.push({ _id: new ObjectId(cleanId) });
+        } catch { }
+      }
+      const shopFilter = isSuperAdmin && !shopId ? {} : getShopFilter(shopId);
+      const conditions: any[] = [{ $or: idConditions }, shopFilter];
+      if (!isSuperAdmin) {
+        conditions.push({ role: { $ne: "superadmin" } });
+      }
+      const user = await db.collection<DbUser>("users").findOne({
+        $and: conditions,
+      });
+      if (!user) return null;
+      const { _id, ...rest } = user as any;
+      const u = {
+        ...rest,
+        id: rest.id || _id?.toString() || rest.username,
+      } as DbUser;
+      if (!u.permissions) {
+        u.permissions = u.role === "admin" || u.role === "superadmin" ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_STAFF_PERMISSIONS;
+      }
+      return u;
+    }
+
+    const memUser = memoryStore.users.find((u) => {
+      if (!isSuperAdmin && u.role === "superadmin") return false;
+      const idMatch = u.id === cleanId || u.username.toLowerCase() === cleanId.toLowerCase();
+      if (!idMatch) return false;
+      if (isSuperAdmin && !shopId) return true;
+      return matchesShop(u.shopId, shopId);
+    });
+    if (!memUser) return null;
+    if (!memUser.permissions) {
+      memUser.permissions = memUser.role === "admin" || memUser.role === "superadmin" ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_STAFF_PERMISSIONS;
+    }
+    return memUser;
+  }
+
+  async updateUserForShop(
+    userId: string,
+    updates: {
+      name?: string;
+      email?: string;
+      password?: string;
+      role?: "admin" | "staff" | "superadmin";
+      permissions?: UserPermissions;
+    },
+    shopId: string,
+    isSuperAdmin: boolean = false
+  ): Promise<Omit<DbUser, "passwordHash">> {
+    const cleanId = String(userId).trim();
+    const updatedAt = new Date().toISOString();
+    const updateFields: any = { updatedAt };
+
+    // Prevent non-superadmin from escalating role to superadmin or unauthorized platform role
+    if (!isSuperAdmin && updates.role !== undefined) {
+      if (updates.role === "superadmin" || !["admin", "staff"].includes(updates.role)) {
+        throw new Error("Access denied. Shop admin superadmin ya unauthorized role assign nahi kar sakta.");
+      }
+    }
+
+    // Direct superadmin protection: non-superadmin can NEVER target superadmin
+    if (!isSuperAdmin && (cleanId.toLowerCase() === "superadmin" || cleanId === "superadmin-1")) {
+      throw new Error("Access denied. Superadmin account ko shop admin modify nahi kar sakta.");
+    }
+
+    if (updates.name !== undefined) updateFields.name = updates.name.trim();
+    if (updates.email !== undefined) updateFields.email = updates.email.trim();
+    if (updates.role !== undefined) updateFields.role = updates.role;
+    if (updates.permissions !== undefined) updateFields.permissions = updates.permissions;
+    if (updates.password !== undefined && updates.password !== "") {
+      if (typeof updates.password !== "string" || updates.password.length < 8) {
+        throw new Error("Password kam az kam 8 characters ka hona chahiye.");
+      }
+      updateFields.passwordHash = await bcrypt.hash(updates.password, 10);
+    }
+
+    if (isMongoConfigured()) {
+      const db = await getDb();
+      const idConditions: any[] = [
+        { id: cleanId },
+        { username: cleanId.toLowerCase() },
+      ];
+      if (ObjectId.isValid(cleanId)) {
+        try {
+          idConditions.push({ _id: new ObjectId(cleanId) });
+        } catch { }
+      }
+
+      // CRITICAL: Strictly scoped to authorized shop! Zero unscoped fallback!
+      const shopFilter = isSuperAdmin && !shopId ? {} : getShopFilter(shopId);
+      const conditions: any[] = [{ $or: idConditions }, shopFilter];
+      if (!isSuperAdmin) {
+        conditions.push({ role: { $ne: "superadmin" } });
+      }
+      const existingUser = await db.collection<DbUser>("users").findOne({
+        $and: conditions,
+      });
+
+      if (!existingUser) {
+        throw new Error("User nahi mila ya is dukan se talluq nahi rakhta.");
+      }
+
+      // Non-superadmin cannot modify a superadmin user
+      if (!isSuperAdmin && existingUser.role === "superadmin") {
+        throw new Error("Access denied. Superadmin account ko shop admin modify nahi kar sakta.");
+      }
+
+      const res = await db.collection<DbUser>("users").findOneAndUpdate(
+        { _id: existingUser._id },
+        { $set: updateFields },
+        { returnDocument: "after" }
+      );
+      if (!res) throw new Error("User nahi mila ya is dukan se talluq nahi rakhta.");
+      const { _id, passwordHash, ...rest } = res as any;
+      const sanitized = {
+        ...rest,
+        id: rest.id || _id?.toString() || rest.username,
+      };
+
+      // Also update memoryStore if matching shop
+      const memIdx = memoryStore.users.findIndex(
+        (u) =>
+          (!isSuperAdmin ? u.role !== "superadmin" : true) &&
+          (u.id === cleanId || u.username.toLowerCase() === cleanId.toLowerCase()) &&
+          (isSuperAdmin && !shopId ? true : matchesShop(u.shopId, shopId))
+      );
+      if (memIdx !== -1) {
+        memoryStore.users[memIdx] = { ...memoryStore.users[memIdx], ...updateFields };
+      }
+
+      return sanitized as Omit<DbUser, "passwordHash">;
+    }
+
+    // In-memory fallback: STRICTLY scoped to shopId!
+    const idx = memoryStore.users.findIndex((u) => {
+      if (!isSuperAdmin && u.role === "superadmin") return false;
+      const idMatch = u.id === cleanId || u.username.toLowerCase() === cleanId.toLowerCase();
+      if (!idMatch) return false;
+      if (isSuperAdmin && !shopId) return true;
+      return matchesShop(u.shopId, shopId);
+    });
+
+    if (idx === -1) {
+      throw new Error("User nahi mila ya is dukan se talluq nahi rakhta.");
+    }
+
+    // Non-superadmin cannot modify a superadmin user
+    if (!isSuperAdmin && memoryStore.users[idx].role === "superadmin") {
+      throw new Error("Access denied. Superadmin account ko shop admin modify nahi kar sakta.");
+    }
+
+    const updated = { ...memoryStore.users[idx], ...updateFields };
+    memoryStore.users[idx] = updated;
+    const { passwordHash, ...sanitized } = updated;
+    return sanitized as any;
+  }
+
+  async deleteShopUser(
+    userId: string,
+    shopId: string,
+    currentUserId?: string,
+    isSuperAdmin: boolean = false
+  ): Promise<boolean> {
+    const cleanId = String(userId).trim();
+    const cleanCurrent = currentUserId ? String(currentUserId).trim().toLowerCase() : "";
+
+    if (cleanCurrent && (cleanId.toLowerCase() === cleanCurrent)) {
+      throw new Error("Aap apna active logged in account delete nahi kar sakte.");
+    }
+    if (cleanId === "user-1" || cleanId.toLowerCase() === "admin") {
+      throw new Error("Primary Admin / Dukan ka malik delete nahi kiya ja sakta.");
+    }
+    if (cleanId === "superadmin-1" || cleanId.toLowerCase() === "superadmin") {
+      throw new Error("Access denied. Superadmin account ko delete nahi kiya ja sakta.");
+    }
+
+    if (isMongoConfigured()) {
+      const db = await getDb();
+      const idConditions: any[] = [
+        { id: cleanId },
+        { username: cleanId.toLowerCase() },
+      ];
+      if (ObjectId.isValid(cleanId)) {
+        try {
+          idConditions.push({ _id: new ObjectId(cleanId) });
+        } catch { }
+      }
+
+      // CRITICAL: Strictly scoped to authorized shop! Zero unscoped fallback!
+      const shopFilter = isSuperAdmin && !shopId ? {} : getShopFilter(shopId);
+      const conditions: any[] = [{ $or: idConditions }, shopFilter];
+      if (!isSuperAdmin) {
+        conditions.push({ role: { $ne: "superadmin" } });
+      }
+      const user = await db.collection<DbUser>("users").findOne({
+        $and: conditions,
+      });
+
+      if (!user) {
+        throw new Error("User nahi mila ya is dukan se talluq nahi rakhta.");
+      }
+
+      // Check permissions & root protection
+      if (cleanCurrent && (user.id === cleanCurrent || user.username?.toLowerCase() === cleanCurrent)) {
+        throw new Error("Aap apna active logged in account delete nahi kar sakte.");
+      }
+      if (user.username === "admin" || user.id === "user-1") {
+        throw new Error("Primary Admin / Dukan ka malik delete nahi kiya ja sakta.");
+      }
+      if (user.role === "superadmin" || user.username?.toLowerCase() === "superadmin") {
+        throw new Error("Access denied. Superadmin account ko delete nahi kiya ja sakta.");
+      }
+
+      const res = await db.collection("users").deleteOne({ _id: user._id });
+      if (res.deletedCount === 0) {
+        throw new Error("User delete nahi ho saka.");
+      }
+
+      // Also clean memoryStore if present
+      const memIdx = memoryStore.users.findIndex(
+        (u) =>
+          (!isSuperAdmin ? u.role !== "superadmin" : true) &&
+          (u.id === cleanId || u.username.toLowerCase() === cleanId.toLowerCase()) &&
+          (isSuperAdmin && !shopId ? true : matchesShop(u.shopId, shopId))
+      );
+      if (memIdx !== -1) {
+        memoryStore.users.splice(memIdx, 1);
+      }
       return true;
     }
-    memoryStore.users = memoryStore.users.filter((u) => u.id !== userId);
+
+    // In-memory fallback: STRICTLY scoped to shopId!
+    const userIndex = memoryStore.users.findIndex((u) => {
+      if (!isSuperAdmin && u.role === "superadmin") return false;
+      const idMatch = u.id === cleanId || u.username.toLowerCase() === cleanId.toLowerCase();
+      if (!idMatch) return false;
+      if (isSuperAdmin && !shopId) return true;
+      return matchesShop(u.shopId, shopId);
+    });
+
+    if (userIndex === -1) {
+      throw new Error("User nahi mila ya is dukan se talluq nahi rakhta.");
+    }
+
+    const memUser = memoryStore.users[userIndex];
+    if (cleanCurrent && (memUser.id === cleanCurrent || memUser.username?.toLowerCase() === cleanCurrent)) {
+      throw new Error("Aap apna active logged in account delete nahi kar sakte.");
+    }
+    if (memUser.username === "admin" || memUser.id === "user-1") {
+      throw new Error("Primary Admin / Dukan ka malik delete nahi kiya ja sakta.");
+    }
+    if (memUser.role === "superadmin" || memUser.username?.toLowerCase() === "superadmin") {
+      throw new Error("Access denied. Superadmin account ko delete nahi kiya ja sakta.");
+    }
+
+    memoryStore.users.splice(userIndex, 1);
     return true;
+  }
+
+  async deleteUser(
+    userId: string,
+    shopId: string = DEFAULT_SHOP_ID,
+    currentUserId?: string,
+    isSuperAdmin: boolean = false
+  ): Promise<boolean> {
+    return this.deleteShopUser(userId, shopId, currentUserId, isSuperAdmin);
   }
 
   async getSaaSStats(): Promise<SaaSStats> {
@@ -470,7 +836,8 @@ class MongoDBAtlasDatabase {
     await this.ensureIndexes();
 
     const part = await this.getPart(batchData.partId, targetShop);
-    const partName = batchData.partName || part?.name || "Spare Part";
+    if (!part) throw new Error("Part not found or does not belong to this shop");
+    const partName = batchData.partName || part.name || "Spare Part";
 
     const newBatch: PurchaseBatch = {
       id: `batch-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -856,6 +1223,9 @@ class MongoDBAtlasDatabase {
 
   async deletePart(id: string, shopId?: string): Promise<boolean> {
     const targetShop = shopId || DEFAULT_SHOP_ID;
+    const part = await this.getPart(id, targetShop);
+    if (!part) throw new Error("Part not found or does not belong to this shop");
+
     if (isMongoConfigured()) {
       const db = await getDb();
       const filter = { id, ...getShopFilter(targetShop) };
@@ -980,6 +1350,9 @@ class MongoDBAtlasDatabase {
 
   async deleteCustomer(id: string, shopId?: string): Promise<boolean> {
     const targetShop = shopId || DEFAULT_SHOP_ID;
+    const cust = await this.getCustomer(id, targetShop);
+    if (!cust) throw new Error("Customer not found or does not belong to this shop");
+
     if (isMongoConfigured()) {
       const db = await getDb();
       const filter = { id, ...getShopFilter(targetShop) };
@@ -1265,6 +1638,9 @@ class MongoDBAtlasDatabase {
 
   async deleteBill(id: string, shopId?: string): Promise<boolean> {
     const targetShop = shopId || DEFAULT_SHOP_ID;
+    const bill = await this.getBill(id, targetShop);
+    if (!bill) throw new Error("Bill not found or does not belong to this shop");
+
     if (isMongoConfigured()) {
       const db = await getDb();
       const filter = { id, ...getShopFilter(targetShop) };
@@ -1350,6 +1726,9 @@ class MongoDBAtlasDatabase {
 
   async deleteMechanic(id: string, shopId?: string): Promise<boolean> {
     const targetShop = shopId || DEFAULT_SHOP_ID;
+    const mech = await this.getMechanic(id, targetShop);
+    if (!mech) throw new Error("Mechanic not found or does not belong to this shop");
+
     if (isMongoConfigured()) {
       const db = await getDb();
       const filter = { id, ...getShopFilter(targetShop) };
@@ -1369,12 +1748,12 @@ class MongoDBAtlasDatabase {
       const db = await getDb();
       const filter: any = mechanicId
         ? {
-            ...shopFilter,
-            $or: [
-              { mechanicId },
-              { mechanicName: { $regex: new RegExp(`^${mechanicId}$`, "i") } },
-            ],
-          }
+          ...shopFilter,
+          $or: [
+            { mechanicId },
+            { mechanicName: { $regex: new RegExp(`^${mechanicId}$`, "i") } },
+          ],
+        }
         : shopFilter;
       const entries = await db.collection<MechanicLedgerEntry>("mechanicLedger").find(filter).sort({ date: -1 }).toArray();
       return entries.map(({ _id, ...rest }: any) => rest as MechanicLedgerEntry);
@@ -1399,7 +1778,8 @@ class MongoDBAtlasDatabase {
   ): Promise<MechanicLedgerEntry> {
     const targetShop = shopId || DEFAULT_SHOP_ID;
     const mechanic = await this.getMechanic(mechanicId, targetShop);
-    const mechName = mechanic ? mechanic.name : "Mechanic";
+    if (!mechanic) throw new Error("Mechanic not found or does not belong to this shop");
+    const mechName = mechanic.name;
 
     const entry: MechanicLedgerEntry = {
       id: `mled-${Date.now()}`,
@@ -1692,6 +2072,9 @@ class MongoDBAtlasDatabase {
 
   async deleteJobCard(id: string, shopId?: string): Promise<boolean> {
     const targetShop = shopId || DEFAULT_SHOP_ID;
+    const card = await this.getJobCard(id, targetShop);
+    if (!card) throw new Error("Job card not found or does not belong to this shop");
+
     if (isMongoConfigured()) {
       const db = await getDb();
       const filter = { id, ...getShopFilter(targetShop) };
@@ -1822,6 +2205,9 @@ class MongoDBAtlasDatabase {
 
   async deleteSupplierCredit(id: string, shopId?: string): Promise<boolean> {
     const targetShop = shopId || DEFAULT_SHOP_ID;
+    const credit = await this.getSupplierCredit(id, targetShop);
+    if (!credit) throw new Error("Supplier credit entry not found or does not belong to this shop");
+
     if (isMongoConfigured()) {
       const db = await getDb();
       const filter = { id, ...getShopFilter(targetShop) };
@@ -1977,19 +2363,25 @@ class MongoDBAtlasDatabase {
         });
         if (user) {
           const { _id, ...rest } = user as any;
-          return rest as DbUser;
+          const u = rest as DbUser;
+          if (!u.permissions) {
+            u.permissions = u.role === "admin" || u.role === "superadmin" ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_STAFF_PERMISSIONS;
+          }
+          return u;
         }
       } catch (err) {
         console.error("MongoDB user lookup error:", err);
       }
     }
 
-    return (
-      memoryStore.users.find(
-        (u) =>
-          u.username.toLowerCase() === clean || u.email.toLowerCase() === clean
-      ) || null
+    const memUser = memoryStore.users.find(
+      (u) =>
+        u.username.toLowerCase() === clean || u.email.toLowerCase() === clean
     );
+    if (memUser && !memUser.permissions) {
+      memUser.permissions = memUser.role === "admin" || memUser.role === "superadmin" ? DEFAULT_ADMIN_PERMISSIONS : DEFAULT_STAFF_PERMISSIONS;
+    }
+    return memUser || null;
   }
 
   async ensureInitialShops(): Promise<void> {
@@ -2005,27 +2397,73 @@ class MongoDBAtlasDatabase {
     }
   }
 
+  private initialUsersEnsured = false;
+
   async ensureInitialUsers(): Promise<void> {
-    if (!isMongoConfigured()) return;
+    if (!isMongoConfigured() || this.initialUsersEnsured) return;
     try {
       const db = await getDb();
       const count = await db.collection("users").countDocuments();
       if (count === 0) {
-        await db.collection("users").insertMany(INITIAL_SEEDED_USERS as any);
+        const usersToSeed = await Promise.all(
+          INITIAL_SEEDED_USERS.map(async (u) => {
+            if (u.role === "superadmin" && process.env.SUPERADMIN_INITIAL_PASSWORD && process.env.SUPERADMIN_INITIAL_PASSWORD.length >= 8) {
+              const hash = await bcrypt.hash(process.env.SUPERADMIN_INITIAL_PASSWORD, 10);
+              return { ...u, passwordHash: hash };
+            }
+            if (u.username === "admin" && process.env.ADMIN_INITIAL_PASSWORD && process.env.ADMIN_INITIAL_PASSWORD.length >= 8) {
+              const hash = await bcrypt.hash(process.env.ADMIN_INITIAL_PASSWORD, 10);
+              return { ...u, passwordHash: hash };
+            }
+            return u;
+          })
+        );
+        await db.collection("users").insertMany(usersToSeed as any);
       } else {
-        // Ensure each initial seed user exists
-        for (const u of INITIAL_SEEDED_USERS) {
-          const existing = await db.collection("users").findOne({ username: u.username });
-          if (!existing) {
-            await db.collection("users").insertOne(u as any);
+        // Ensure root superadmin exists if missing
+        const superAdminExists = await db.collection("users").findOne({ role: "superadmin" });
+        if (!superAdminExists) {
+          const superAdminSeed = INITIAL_SEEDED_USERS.find((u) => u.role === "superadmin");
+          if (superAdminSeed) {
+            let seedToInsert = { ...superAdminSeed };
+            if (process.env.SUPERADMIN_INITIAL_PASSWORD && process.env.SUPERADMIN_INITIAL_PASSWORD.length >= 8) {
+              seedToInsert.passwordHash = await bcrypt.hash(process.env.SUPERADMIN_INITIAL_PASSWORD, 10);
+            }
+            await db.collection("users").insertOne(seedToInsert as any);
           }
         }
+
+        // Ensure primary default shop admin exists if missing
+        const primaryAdminExists = await db.collection("users").findOne({
+          $or: [{ username: "admin" }, { id: "user-1" }],
+        });
+        if (!primaryAdminExists) {
+          const adminSeed = INITIAL_SEEDED_USERS.find((u) => u.username === "admin");
+          if (adminSeed) {
+            let seedToInsert = { ...adminSeed };
+            if (process.env.ADMIN_INITIAL_PASSWORD && process.env.ADMIN_INITIAL_PASSWORD.length >= 8) {
+              seedToInsert.passwordHash = await bcrypt.hash(process.env.ADMIN_INITIAL_PASSWORD, 10);
+            }
+            await db.collection("users").insertOne(seedToInsert as any);
+          }
+        }
+
         // Ensure existing users without shopId are assigned to default shop
         await db.collection("users").updateMany(
           { role: { $ne: "superadmin" }, shopId: { $exists: false } },
           { $set: { shopId: DEFAULT_SHOP_ID } }
         );
+        // Ensure existing users without permissions are assigned default permissions
+        await db.collection("users").updateMany(
+          { role: "staff", permissions: { $exists: false } },
+          { $set: { permissions: DEFAULT_STAFF_PERMISSIONS } }
+        );
+        await db.collection("users").updateMany(
+          { role: { $in: ["admin", "superadmin"] }, permissions: { $exists: false } },
+          { $set: { permissions: DEFAULT_ADMIN_PERMISSIONS } }
+        );
       }
+      this.initialUsersEnsured = true;
     } catch (err) {
       console.error("MongoDB ensureInitialUsers error:", err);
     }

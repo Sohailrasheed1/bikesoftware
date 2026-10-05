@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/server/db";
+import { authorizeRequest } from "@/lib/server/auth-guard";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { errorResponse } = await authorizeRequest(request, { requireSuperAdmin: true });
+    if (errorResponse) return errorResponse;
+
     const shops = await db.getShops();
     return NextResponse.json(shops);
   } catch (err: any) {
@@ -14,12 +18,22 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const { errorResponse } = await authorizeRequest(request, { requireSuperAdmin: true });
+    if (errorResponse) return errorResponse;
+
     const body = await request.json();
     const { name, urduName, ownerName, phone, address, city, monthlyRent, billingCycle, subscriptionEnd, adminUsername, adminPassword, seedSampleParts, notes } = body;
 
     if (!name || !adminUsername || !adminPassword) {
       return NextResponse.json(
         { error: "Dukan ka naam, username, aur password lazmi hain." },
+        { status: 400 }
+      );
+    }
+
+    if (typeof adminPassword !== "string" || adminPassword.length < 8) {
+      return NextResponse.json(
+        { error: "Password kam az kam 8 characters ka hona chahiye." },
         { status: 400 }
       );
     }

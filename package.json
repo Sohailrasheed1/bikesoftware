@@ -6,7 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "node test_auth_security.js && node test_shop_isolation.js && node test_backend_authorization.js && node test_direct_api_attacks.js && node test_frontend_routes_security.js && node test_step6_shop_isolation.js && node test_e2e_user_workflows.js",
+    "test:auth": "node test_auth_security.js",
+    "test:isolation": "node test_shop_isolation.js",
+    "test:authorization": "node test_backend_authorization.js",
+    "test:direct-attacks": "node test_direct_api_attacks.js",
+    "test:frontend-guards": "node test_frontend_routes_security.js",
+    "test:step6": "node test_step6_shop_isolation.js",
+    "test:workflows": "node test_e2e_user_workflows.js"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",

@@ -1,15 +1,20 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/server/db";
-import { getTenantShopId } from "@/lib/server/tenant";
+import { authorizeRequest } from "@/lib/server/auth-guard";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
-    const shopId = await getTenantShopId(request);
-    await db.resetToSampleData(shopId);
+    const { auth, errorResponse } = await authorizeRequest(request, {
+      requireAdmin: true,
+    });
+    if (errorResponse) return errorResponse;
+
+    await db.resetToSampleData(auth.shopId);
     return NextResponse.json({ success: true, message: "Shop data reset successfully" });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
+

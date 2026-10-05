@@ -94,15 +94,12 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## 🔑 Default Login Credentials
+## 🔐 Authentication & Security
 
-| Role | Username | Password |
-| :--- | :--- | :--- |
-| **Admin** | `admin` | `admin123` |
-| **Manager** | `sohail` | `sohail123` |
-| **Staff** | `staff` | `staff123` |
-
-*(1-click demo login buttons are also available on the login page)*
+- **Authentication**: Powered by NextAuth.js with bcrypt cryptographic password hashing.
+- **Passwords**: All user passwords must be at least 8 characters long.
+- **Production Secrets**: Ensure `NEXTAUTH_SECRET` is set in production via environment variable using a strong random 32+ character key.
+- **Initial Setup**: Initial admin credentials can be configured securely during database provisioning.
 
 ---
 

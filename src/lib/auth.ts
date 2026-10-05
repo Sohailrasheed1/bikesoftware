@@ -23,59 +23,59 @@ export const authOptions: NextAuthOptions = {
           // Look up user from database
           const user = await db.getUserByUsernameOrEmail(u);
 
-          if (user) {
-            let isMatch = false;
-            if (user.passwordHash) {
-              isMatch = await bcrypt.compare(p, user.passwordHash);
-            }
-
-            // High-tolerance fallback for platform superadmin (superadmin123, admin123, or superadmin)
-            if (!isMatch && user.role === "superadmin") {
-              if (p === "superadmin123" || p === "admin123" || p === "superadmin" || p === "sohail123") {
-                isMatch = true;
-              }
-            }
-
-            // Fallback for default shop admin, sohail, staff
-            if (!isMatch) {
-              if (user.username === "admin" && (p === "admin123" || p === "admin")) isMatch = true;
-              if (user.username === "staff" && (p === "staff123" || p === "staff")) isMatch = true;
-              if (user.username === "sohail" && (p === "sohail123" || p === "sohail" || p === "admin123")) isMatch = true;
-            }
-
-            if (isMatch) {
-              // If user is a shop owner or staff, verify that their shop is active & not expired
-              let shopName = "Jilani Autos";
-              if (user.role !== "superadmin") {
-                const shopId = user.shopId || DEFAULT_SHOP_ID;
-                const shop = await db.getShop(shopId);
-
-                if (shop) {
-                  shopName = shop.name;
-                  if (shop.status === "suspended") {
-                    throw new Error("Aapki dukan ka account suspend kar diya gaya hai. Service provider se rabta karein.");
-                  }
-                  if (
-                    shop.status === "expired" ||
-                    (shop.subscriptionEnd && new Date(shop.subscriptionEnd).getTime() < Date.now())
-                  ) {
-                    throw new Error("Aapka software subscription cycle expire ho chuka hai. Software dobara activate karwane ke liye service provider se rabta karein.");
-                  }
-                }
-              } else {
-                shopName = "Platform Super Admin";
-              }
-
-              return {
-                id: user.id,
-                name: user.name,
-                email: user.email,
-                role: user.role,
-                shopId: user.shopId || (user.role === "superadmin" ? undefined : DEFAULT_SHOP_ID),
-                shopName,
-              };
-            }
+          if (!user || !user.passwordHash || typeof user.passwordHash !== "string") {
+            return null;
           }
+
+          let isMatch = false;
+          try {
+            isMatch = await bcrypt.compare(p, user.passwordHash);
+          } catch (hashErr) {
+            console.error("Password hash comparison error:", hashErr);
+            return null;
+          }
+
+          if (!isMatch) {
+            return null;
+          }
+          // If user is a shop owner or staff, verify that their shop is active & not expired
+          let shopName = "Jilani Autos";
+          if (user.role !== "superadmin") {
+            const shopId = user.shopId || DEFAULT_SHOP_ID;
+            const shop = await db.getShop(shopId);
+
+            if (shop) {
+              shopName = shop.name;
+              if (shop.status === "suspended") {
+                throw new Error("Aapki dukan ka account suspend kar diya gaya hai. Service provider se rabta karein.");
+              }
+              if (
+                shop.status === "expired" ||
+                (shop.subscriptionEnd && new Date(shop.subscriptionEnd).getTime() < Date.now())
+              ) {
+                throw new Error("Aapka software subscription cycle expire ho chuka hai. Software dobara activate karwane ke liye service provider se rabta karein.");
+              }
+            }
+          } else {
+            shopName = "Platform Super Admin";
+          }
+
+          const permissions = user.permissions || (user.role === "admin" || user.role === "superadmin" ? {
+            pos: true, workshop: true, inventory: true, customers: true, bills: true, mechanics: true, suppliers: true, reports: true, viewSalesAndProfit: true
+          } : {
+            pos: true, workshop: true, inventory: true, customers: true, bills: true, mechanics: true, suppliers: false, reports: false, viewSalesAndProfit: false
+          });
+
+          return {
+            id: user.id || (user as any)._id?.toString() || user.username,
+            username: user.username,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            shopId: user.shopId || (user.role === "superadmin" ? undefined : DEFAULT_SHOP_ID),
+            shopName,
+            permissions,
+          };
         } catch (err: any) {
           console.error("Auth authorize error:", err);
           throw new Error(err.message || "Invalid credentials");
@@ -104,20 +104,37 @@ export const authOptions: NextAuthOptions = {
     },
     async jwt({ token, user }) {
       if (user) {
+        token.id = user.id;
+        token.username = (user as any).username || (user as any).email?.split("@")[0];
         token.role = (user as any).role;
         token.shopId = (user as any).shopId;
         token.shopName = (user as any).shopName;
+        token.permissions = (user as any).permissions;
       }
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
-        (session.user as any).role = token.role;
+      if (session?.user) {
+        (session.user as any).id = token.id || token.sub;
+        (session.user as any).username = token.username || (session.user as any).email?.split("@")[0];
+        (session.user as any).role = token.role || "staff";
         (session.user as any).shopId = token.shopId;
         (session.user as any).shopName = token.shopName;
+        (session.user as any).permissions = token.permissions;
       }
       return session;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET || "skander_spare_parts_super_secret_jwt_key_2026_xyz",
+  secret: (() => {
+    const secret = process.env.NEXTAUTH_SECRET;
+    if (!secret) {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(
+          "FATAL SECURITY ERROR: NEXTAUTH_SECRET environment variable is missing in production! A strong random secret must be configured."
+        );
+      }
+      return "dev_fallback_secret_not_for_production_use_only";
+    }
+    return secret;
+  })(),
 };

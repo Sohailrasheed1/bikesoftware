@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/server/db";
-import { getTenantShopId } from "@/lib/server/tenant";
+import { authorizeRequest, validateBodySecurity } from "@/lib/server/auth-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -9,34 +9,41 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const shopId = await getTenantShopId(request);
+    const { auth, errorResponse } = await authorizeRequest(request, {
+      requiredPermission: "workshop",
+    });
+    if (errorResponse) return errorResponse;
+
     const body = await request.json();
+    const bodyError = validateBodySecurity(body, auth);
+    if (bodyError) return bodyError;
+
     const { action } = body;
 
     switch (action) {
       case "addPart": {
         const { partId, quantity } = body;
-        const updated = await db.addPartToJobCard(params.id, partId, Number(quantity) || 1, shopId);
+        const updated = await db.addPartToJobCard(params.id, partId, Number(quantity) || 1, auth.shopId);
         return NextResponse.json(updated);
       }
       case "updatePartQty": {
         const { partId, delta } = body;
-        const updated = await db.updateJobCardPartQty(params.id, partId, Number(delta) || 0, shopId);
+        const updated = await db.updateJobCardPartQty(params.id, partId, Number(delta) || 0, auth.shopId);
         return NextResponse.json(updated);
       }
       case "removePart": {
         const { partId } = body;
-        const updated = await db.removePartFromJobCard(params.id, partId, shopId);
+        const updated = await db.removePartFromJobCard(params.id, partId, auth.shopId);
         return NextResponse.json(updated);
       }
       case "addLabour": {
         const { labour } = body;
-        const updated = await db.addLabourToJobCard(params.id, labour, shopId);
+        const updated = await db.addLabourToJobCard(params.id, labour, auth.shopId);
         return NextResponse.json(updated);
       }
       case "removeLabour": {
         const { labourId } = body;
-        const updated = await db.removeLabourFromJobCard(params.id, labourId, shopId);
+        const updated = await db.removeLabourFromJobCard(params.id, labourId, auth.shopId);
         return NextResponse.json(updated);
       }
       case "complete": {
@@ -46,7 +53,7 @@ export async function POST(
           paymentMethod || "Cash",
           Number(discount) || 0,
           notes,
-          shopId
+          auth.shopId
         );
         return NextResponse.json(result);
       }
@@ -54,6 +61,9 @@ export async function POST(
         return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
     }
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 400 });
+    const isNotFound = err.message?.includes("not found") || err.message?.includes("nahi mila");
+    const status = isNotFound ? 404 : 400;
+    return NextResponse.json({ error: err.message }, { status });
   }
 }
+

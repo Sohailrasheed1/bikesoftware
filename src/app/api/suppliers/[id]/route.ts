@@ -1,13 +1,17 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/server/db";
-import { getTenantShopId } from "@/lib/server/tenant";
+import { authorizeRequest, validateBodySecurity, sanitizePayloadUpdates } from "@/lib/server/auth-guard";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   try {
-    const shopId = await getTenantShopId(request);
-    const credit = await db.getSupplierCredit(params.id, shopId);
+    const { auth, errorResponse } = await authorizeRequest(request, {
+      requiredPermission: "suppliers",
+    });
+    if (errorResponse) return errorResponse;
+
+    const credit = await db.getSupplierCredit(params.id, auth.shopId);
     if (!credit) {
       return NextResponse.json({ error: "Supplier credit not found" }, { status: 404 });
     }
@@ -19,21 +23,38 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
   try {
-    const shopId = await getTenantShopId(request);
+    const { auth, errorResponse } = await authorizeRequest(request, {
+      requiredPermission: "suppliers",
+    });
+    if (errorResponse) return errorResponse;
+
     const updates = await request.json();
-    const updated = await db.updateSupplierCredit(params.id, updates, shopId);
+    const bodyError = validateBodySecurity(updates, auth);
+    if (bodyError) return bodyError;
+
+    const sanitizedUpdates = sanitizePayloadUpdates(updates);
+    const updated = await db.updateSupplierCredit(params.id, sanitizedUpdates, auth.shopId);
     return NextResponse.json(updated);
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 400 });
+    const isNotFound = err.message?.includes("not found") || err.message?.includes("nahi mila");
+    const status = isNotFound ? 404 : 400;
+    return NextResponse.json({ error: err.message }, { status });
   }
 }
 
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
-    const shopId = await getTenantShopId(request);
-    await db.deleteSupplierCredit(params.id, shopId);
+    const { auth, errorResponse } = await authorizeRequest(request, {
+      requireAdmin: true,
+    });
+    if (errorResponse) return errorResponse;
+
+    await db.deleteSupplierCredit(params.id, auth.shopId);
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 400 });
+    const isNotFound = err.message?.includes("not found") || err.message?.includes("nahi mila");
+    const status = isNotFound ? 404 : 400;
+    return NextResponse.json({ error: err.message }, { status });
   }
 }
+

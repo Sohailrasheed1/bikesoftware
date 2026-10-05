@@ -267,6 +267,42 @@ export interface Shop {
   updatedAt: string;
 }
 
+export interface UserPermissions {
+  pos: boolean;            // Fast POS & Billing (/billing)
+  workshop: boolean;       // Live Workshop Bay (/workshop)
+  inventory: boolean;      // Saman & Stock (/inventory)
+  customers: boolean;      // Gahak Record (/customers)
+  bills: boolean;          // Purane Bills (/bills)
+  mechanics: boolean;      // Mechanics & Labour (/mechanics)
+  suppliers: boolean;      // Supplier Udhaar (/suppliers)
+  reports: boolean;        // Munafa & Reports (/reports)
+  viewSalesAndProfit: boolean; // Roz ki sale aur munafa stats dekhne ka access
+}
+
+export const DEFAULT_ADMIN_PERMISSIONS: UserPermissions = {
+  pos: true,
+  workshop: true,
+  inventory: true,
+  customers: true,
+  bills: true,
+  mechanics: true,
+  suppliers: true,
+  reports: true,
+  viewSalesAndProfit: true,
+};
+
+export const DEFAULT_STAFF_PERMISSIONS: UserPermissions = {
+  pos: true,
+  workshop: true,
+  inventory: true,
+  customers: true,
+  bills: true,
+  mechanics: true,
+  suppliers: false,
+  reports: false,
+  viewSalesAndProfit: false,
+};
+
 export interface User {
   id: string;
   name: string;
@@ -274,6 +310,7 @@ export interface User {
   role: UserRole;
   shopId?: string;
   shopName?: string;
+  permissions?: UserPermissions;
 }
 
 export interface DbUser {
@@ -284,6 +321,7 @@ export interface DbUser {
   passwordHash: string; // Cryptographically hashed with bcrypt
   role: UserRole;
   shopId?: string; // undefined for superadmin, shop ID for clients
+  permissions?: UserPermissions;
   createdAt: string;
   updatedAt: string;
 }

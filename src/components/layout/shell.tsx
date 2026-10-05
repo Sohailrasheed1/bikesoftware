@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { RouteGuard } from "./module-guard";
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -15,36 +16,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const isLoginPage = pathname === "/login";
   const isSuperAdmin = pathname.startsWith("/super-admin");
 
-  // Save active online session to localStorage for offline fallback
+  // If unauthenticated and on a protected page, purge stale storage and redirect to login
   useEffect(() => {
-    if (status === "authenticated" && session?.user) {
-      try {
-        localStorage.setItem("jilani_autos_logged_in", "true");
-        localStorage.setItem("jilani_autos_offline_session", JSON.stringify(session.user));
-      } catch (e) {}
-    }
-  }, [status, session]);
-
-  // If unauthenticated and on a protected page (and no local offline session), redirect to login
-  useEffect(() => {
-    const hasOfflineSession =
-      typeof window !== "undefined" &&
-      (localStorage.getItem("jilani_autos_logged_in") === "true" ||
-        localStorage.getItem("gilani_autos_logged_in") === "true" ||
-        !!localStorage.getItem("jilani_autos_offline_session") ||
-        !!localStorage.getItem("gilani_autos_offline_session"));
-
-    if (hasOfflineSession && typeof window !== "undefined") {
-      // Auto-migrate legacy storage keys
-      if (!localStorage.getItem("jilani_autos_logged_in") && localStorage.getItem("gilani_autos_logged_in")) {
-        localStorage.setItem("jilani_autos_logged_in", "true");
+    if (!isLoginPage && status === "unauthenticated") {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("jilani_autos_logged_in");
+        localStorage.removeItem("gilani_autos_logged_in");
+        localStorage.removeItem("jilani_autos_offline_session");
+        localStorage.removeItem("gilani_autos_offline_session");
       }
-      if (!localStorage.getItem("jilani_autos_offline_session") && localStorage.getItem("gilani_autos_offline_session")) {
-        localStorage.setItem("jilani_autos_offline_session", localStorage.getItem("gilani_autos_offline_session")!);
-      }
-    }
-
-    if (!isLoginPage && status === "unauthenticated" && !hasOfflineSession) {
       const redirectUrl =
         pathname && pathname !== "/"
           ? `/login?callbackUrl=${encodeURIComponent(pathname)}`
@@ -58,14 +38,20 @@ export function Shell({ children }: { children: React.ReactNode }) {
     return <main className="min-h-screen bg-slate-50">{children}</main>;
   }
 
-  // If on super admin portal, render directly
+  // If on super admin portal, wrap in RouteGuard
   if (isSuperAdmin) {
-    return <main className="min-h-screen bg-slate-900">{children}</main>;
+    return (
+      <main className="min-h-screen bg-slate-900">
+        <RouteGuard pathname={pathname}>
+          {children}
+        </RouteGuard>
+      </main>
+    );
   }
 
   const isSuperAdminUser = (session?.user as any)?.role === "superadmin";
 
-  // Render software dashboard & pages without any blocking authorization overlay
+  // Render software dashboard & pages protected by RouteGuard
   return (
     <div className="min-h-screen flex flex-col bg-slate-50/70 text-slate-900">
       {/* Super Admin Top Control Ribbon (Only visible when Super Admin is viewing shop) */}
@@ -87,7 +73,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
       <Navbar />
       <main className="flex-1 w-full max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-4 sm:py-6">
-        {children}
+        <RouteGuard pathname={pathname}>
+          {children}
+        </RouteGuard>
       </main>
     </div>
   );

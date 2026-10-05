@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Sparkles,
   ChevronDown,
+  Users,
 } from "lucide-react";
 import { LanguageSwitch } from "@/components/ui/language-switch";
 import { PWAInstallButton } from "@/components/ui/pwa-install-button";
@@ -24,11 +25,21 @@ import { useSession, signOut } from "next-auth/react";
 import { useStore } from "@/lib/storage/context";
 import { clearAppCacheAndReload } from "@/lib/cache-manager";
 import { getAssetUrl } from "@/lib/version";
+import { UserManagementModal } from "@/components/users/user-management-modal";
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 
 export function Navbar() {
   const pathname = usePathname();
   const { t, isUrdu } = useLanguage();
   const { data: session } = useSession();
+  const {
+    user: currentUser,
+    role: userRole,
+    isAdmin,
+    isStaff,
+    isSuperAdmin,
+    isLoading: isAuthLoading,
+  } = useCurrentUser();
   const { isOnline, pendingSyncCount, triggerManualSync, resetToSampleData } = useStore();
   const isHome = pathname === "/";
   const [time, setTime] = useState<string>("");
@@ -36,12 +47,11 @@ export function Navbar() {
   const [isResetting, setIsResetting] = useState(false);
   const [showCacheModal, setShowCacheModal] = useState(false);
   const [isClearingCache, setIsClearingCache] = useState(false);
+  const [showUserModal, setShowUserModal] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
-  const userRole = (session?.user as any)?.role;
-  const isSuperAdmin = userRole === "superadmin";
-  const shopDisplayName = (session?.user as any)?.shopName || "Jilani Autos";
+  const shopDisplayName = currentUser?.shopName || (session?.user as any)?.shopName || "Jilani Autos";
 
   // Handle outside click to close profile dropdown
   useEffect(() => {
@@ -184,24 +194,39 @@ export function Navbar() {
 
           {/* Professional User Profile & Settings Dropdown */}
           <div className="relative" ref={profileMenuRef}>
-            <button
-              type="button"
-              onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-              className="flex items-center gap-1.5 sm:gap-2 px-2 py-1 rounded-xl bg-slate-100 hover:bg-slate-200/80 border border-slate-200/80 text-slate-800 text-xs font-bold transition active:scale-95 cursor-pointer"
-              title="Settings & Profile"
-            >
-              <div className="h-6 w-6 rounded-lg bg-blue-600 text-white flex items-center justify-center text-[10px] font-black uppercase flex-shrink-0">
-                {session?.user?.name ? session.user.name.charAt(0) : "A"}
+            {isAuthLoading && !currentUser ? (
+              <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 py-1 rounded-xl bg-slate-100 border border-slate-200/80 animate-pulse">
+                <div className="h-6 w-6 rounded-lg bg-slate-300" />
+                <div className="hidden md:inline w-12 h-3.5 bg-slate-300 rounded" />
               </div>
-              <span className="hidden md:inline max-w-[110px] truncate text-[11px]">
-                {session?.user?.name || "Admin"}
-              </span>
-              <ChevronDown
-                className={`h-3.5 w-3.5 text-slate-500 transition-transform flex-shrink-0 ${
-                  isProfileMenuOpen ? "rotate-180" : ""
-                }`}
-              />
-            </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                className="flex items-center gap-1.5 sm:gap-2 px-2 py-1 rounded-xl bg-slate-100 hover:bg-slate-200/80 border border-slate-200/80 text-slate-800 text-xs font-bold transition active:scale-95 cursor-pointer"
+                title="Settings & Profile"
+              >
+                <div
+                  className={`h-6 w-6 rounded-lg text-white flex items-center justify-center text-[10px] font-black uppercase flex-shrink-0 ${
+                    isSuperAdmin
+                      ? "bg-amber-600"
+                      : isStaff
+                      ? "bg-emerald-600"
+                      : "bg-blue-600"
+                  }`}
+                >
+                  {currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : isStaff ? "S" : "A"}
+                </div>
+                <span className="hidden md:inline max-w-[110px] truncate text-[11px]">
+                  {currentUser?.name || (isStaff ? (isUrdu ? "اسٹاف" : "Staff") : "Admin")}
+                </span>
+                <ChevronDown
+                  className={`h-3.5 w-3.5 text-slate-500 transition-transform flex-shrink-0 ${
+                    isProfileMenuOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+            )}
 
             {isProfileMenuOpen && (
               <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in zoom-in-95 duration-150">
@@ -211,13 +236,13 @@ export function Navbar() {
                     {shopDisplayName}
                   </div>
                   <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    <span className="truncate">{session?.user?.name || "Admin"}</span>
+                    <span className={`h-1.5 w-1.5 rounded-full ${isStaff ? "bg-blue-500" : "bg-emerald-500"}`} />
+                    <span className="truncate">{currentUser?.name || (isStaff ? "Staff" : "Admin")}</span>
                     <span>•</span>
                     <span className="capitalize font-semibold text-slate-600">
-                      {userRole === "superadmin"
+                      {isSuperAdmin
                         ? "Super Admin"
-                        : userRole === "staff"
+                        : isStaff
                         ? isUrdu
                           ? "اسٹاف"
                           : "Staff"
@@ -242,6 +267,21 @@ export function Navbar() {
                     </Link>
                   )}
 
+                  {/* Manage Staff & Users (Admin / Owner Only) */}
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsProfileMenuOpen(false);
+                        setShowUserModal(true);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-blue-700 hover:bg-blue-50 transition cursor-pointer text-left"
+                    >
+                      <Users className="h-4 w-4 text-blue-600" />
+                      <span>{isUrdu ? "اسٹاف و یوزرز کا انتظام" : "Manage Staff & Users"}</span>
+                    </button>
+                  )}
+
                   {/* App Version & Clear Cache */}
                   <button
                     type="button"
@@ -260,18 +300,20 @@ export function Navbar() {
                     </span>
                   </button>
 
-                  {/* Reset Demo Data (Clean handover) */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsProfileMenuOpen(false);
-                      setShowResetModal(true);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-800 transition cursor-pointer text-left"
-                  >
-                    <RotateCcw className="h-4 w-4 text-amber-500" />
-                    <span>{isUrdu ? "ڈیمو ڈیٹا ریسیٹ کریں" : "Reset Demo Data"}</span>
-                  </button>
+                  {/* Reset Demo Data (Admin / Owner Only) */}
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsProfileMenuOpen(false);
+                        setShowResetModal(true);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-amber-50 hover:text-amber-800 transition cursor-pointer text-left"
+                    >
+                      <RotateCcw className="h-4 w-4 text-amber-500" />
+                      <span>{isUrdu ? "ڈیمو ڈیٹا ریسیٹ کریں" : "Reset Demo Data"}</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Divider */}
@@ -416,6 +458,13 @@ export function Navbar() {
           </div>
         </div>
       )}
+
+      {/* Staff & User Management Modal */}
+      <UserManagementModal
+        isOpen={showUserModal}
+        onClose={() => setShowUserModal(false)}
+        currentUserId={(session?.user as any)?.id}
+      />
     </>
   );
 }

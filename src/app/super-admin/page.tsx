@@ -33,6 +33,7 @@ import {
   Receipt,
   Boxes,
   HelpCircle,
+  Loader2,
 } from "lucide-react";
 import { Shop, SaaSStats } from "@/types";
 import { useToast } from "@/components/providers/toast-provider";
@@ -126,8 +127,10 @@ export default function SuperAdminPage() {
   }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (status === "authenticated" && (session?.user as any)?.role === "superadmin") {
+      fetchData();
+    }
+  }, [status, session, fetchData]);
 
   // Show toast notification via global top-right toaster
   const showToast = (text: string, type: "success" | "error" = "success") => {
@@ -141,6 +144,10 @@ export default function SuperAdminPage() {
   // Create Shop Handler
   const handleCreateShop = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!addForm.adminPassword || addForm.adminPassword.length < 8) {
+      showToast("Admin Password kam az kam 8 characters ka hona chahiye.", "error");
+      return;
+    }
     setActionLoading(true);
     try {
       const months = parseInt(addForm.subscriptionMonths) || 1;
@@ -273,6 +280,10 @@ export default function SuperAdminPage() {
   const handleSaveResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedShop) return;
+    if (!newPassword || newPassword.length < 8) {
+      showToast("Password kam az kam 8 characters ka hona chahiye.", "error");
+      return;
+    }
     setActionLoading(true);
     try {
       const res = await fetch(`/api/super-admin/shops/${selectedShop.id}/reset-password`, {
@@ -346,6 +357,18 @@ export default function SuperAdminPage() {
     }
     return { days: diffDays, text: `${diffDays} din baqi`, color: "text-emerald-700" };
   };
+
+  // Immediate protection: Never render Super Admin SaaS UI while session is loading or if user is unauthorized
+  if (status === "loading" || (session?.user as any)?.role !== "superadmin") {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-3 text-slate-400">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+          <span className="text-xs font-bold">Verifying super administrator access...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
@@ -892,9 +915,10 @@ export default function SuperAdminPage() {
                     <input
                       type="text"
                       required
+                      minLength={8}
                       value={addForm.adminPassword}
                       onChange={(e) => setAddForm({ ...addForm, adminPassword: e.target.value })}
-                      placeholder="e.g. madina123"
+                      placeholder="Min 8 characters"
                       className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500 font-mono"
                     />
                   </div>
@@ -1132,9 +1156,10 @@ export default function SuperAdminPage() {
                   <input
                     type={showNewPassword ? "text" : "password"}
                     required
+                    minLength={8}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter new password"
+                    placeholder="Min 8 characters"
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500 font-mono text-sm"
                   />
                   <button

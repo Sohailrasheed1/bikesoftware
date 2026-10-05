@@ -19,10 +19,59 @@ import {
 import { useStore } from "@/lib/storage/context";
 import { useLanguage } from "@/lib/i18n/context";
 import { formatPKR } from "@/lib/utils";
+import { useCurrentUser } from "@/lib/hooks/useCurrentUser";
 
 export default function DashboardPage() {
   const { stats } = useStore();
   const { t, isUrdu } = useLanguage();
+  const { canViewSalesAndProfit, canAccessModule, isLoading } = useCurrentUser();
+
+  // Clean skeleton state while resolving session - prevents any flicker of unauthorized modules
+  if (isLoading) {
+    return (
+      <div className="w-full space-y-4 sm:space-y-6 animate-pulse">
+        {/* Top compact status strip skeleton */}
+        <div className="bg-white px-4 py-3.5 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="h-2.5 w-2.5 rounded-full bg-slate-200" />
+            <div className="h-4 w-28 bg-slate-200 rounded-md" />
+            <div className="h-4 w-32 bg-slate-200 rounded-md hidden sm:block" />
+          </div>
+          <div className="h-4 w-24 bg-slate-200 rounded-md" />
+        </div>
+
+        {/* Modules Grid Skeleton */}
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div
+              key={i}
+              className="p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl bg-white border border-slate-200 min-h-[145px] sm:min-h-[175px] flex flex-col justify-between"
+            >
+              <div className="flex items-start justify-between">
+                <div className="h-11 w-11 sm:h-13 sm:w-13 rounded-xl sm:rounded-2xl bg-slate-200" />
+                <div className="h-4 w-12 bg-slate-200 rounded-full" />
+              </div>
+              <div className="space-y-2 my-2">
+                <div className="h-4 w-28 bg-slate-200 rounded" />
+                <div className="h-3 w-36 bg-slate-200 rounded" />
+              </div>
+              <div className="h-3 w-16 bg-slate-200 rounded" />
+            </div>
+          ))}
+        </div>
+
+        {/* Bottom Strip Skeleton */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 pt-1">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="p-3 bg-white rounded-xl border border-slate-200 text-center space-y-2">
+              <div className="h-3 w-20 bg-slate-200 rounded mx-auto" />
+              <div className="h-5 w-24 bg-slate-200 rounded mx-auto" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   // The 8 Core Shop Modules - Clean, Minimalist, Zero-Clutter App Launcher Grid
   const modules = [
@@ -36,6 +85,7 @@ export default function DashboardPage() {
       borderColor: "border-emerald-300 hover:border-emerald-500",
       badge: isUrdu ? "کاؤنٹر بل" : "Fast Bill",
       badgeStyle: "bg-emerald-100 text-emerald-800 font-bold",
+      visible: canAccessModule("pos"),
     },
     {
       id: "workshop",
@@ -47,6 +97,7 @@ export default function DashboardPage() {
       borderColor: "border-blue-300 hover:border-blue-500",
       badge: `${stats.activeJobsCount} ${isUrdu ? "گاڑیاں" : "Live"}`,
       badgeStyle: stats.activeJobsCount > 0 ? "bg-blue-100 text-blue-800 font-black animate-pulse" : "bg-slate-100 text-slate-600",
+      visible: canAccessModule("workshop"),
     },
     {
       id: "inventory",
@@ -58,6 +109,7 @@ export default function DashboardPage() {
       borderColor: "border-indigo-300 hover:border-indigo-500",
       badge: `${stats.totalPartsCount} ${isUrdu ? "پرزے" : "Parts"}`,
       badgeStyle: stats.lowStockCount > 0 ? "bg-amber-100 text-amber-900 font-bold" : "bg-indigo-50 text-indigo-700",
+      visible: canAccessModule("inventory"),
     },
     {
       id: "suppliers",
@@ -69,6 +121,7 @@ export default function DashboardPage() {
       borderColor: "border-rose-300 hover:border-rose-500",
       badge: stats.overdue15DaysCreditCount > 0 ? `${stats.overdue15DaysCreditCount} Overdue` : formatPKR(stats.totalPendingSupplierCredit),
       badgeStyle: stats.overdue15DaysCreditCount > 0 ? "bg-rose-100 text-rose-800 font-bold animate-pulse" : "bg-rose-50 text-rose-700",
+      visible: canAccessModule("suppliers"),
     },
     {
       id: "customers",
@@ -80,6 +133,7 @@ export default function DashboardPage() {
       borderColor: "border-cyan-300 hover:border-cyan-500",
       badge: `${stats.totalCustomersCount} ${isUrdu ? "گاہک" : "Gahak"}`,
       badgeStyle: "bg-cyan-100 text-cyan-800 font-bold",
+      visible: canAccessModule("customers"),
     },
     {
       id: "mechanics",
@@ -91,6 +145,7 @@ export default function DashboardPage() {
       borderColor: "border-violet-300 hover:border-violet-500",
       badge: stats.totalMechanicPayable > 0 ? formatPKR(stats.totalMechanicPayable) : `${stats.totalMechanicsCount} Staff`,
       badgeStyle: stats.totalMechanicPayable > 0 ? "bg-amber-100 text-amber-900 font-bold" : "bg-slate-100 text-slate-600",
+      visible: canAccessModule("mechanics"),
     },
     {
       id: "bills",
@@ -102,6 +157,7 @@ export default function DashboardPage() {
       borderColor: "border-slate-300 hover:border-slate-500",
       badge: `${stats.todayBillsCount} ${isUrdu ? "آج" : "Today"}`,
       badgeStyle: "bg-slate-100 text-slate-700 font-bold",
+      visible: canAccessModule("bills"),
     },
     {
       id: "reports",
@@ -113,8 +169,11 @@ export default function DashboardPage() {
       borderColor: "border-teal-300 hover:border-teal-500",
       badge: isUrdu ? "منافع" : "Profit",
       badgeStyle: "bg-teal-100 text-teal-800 font-bold",
+      visible: canAccessModule("reports"),
     },
   ];
+
+  const visibleModules = modules.filter((m) => m.visible);
 
   return (
     <div className="w-full space-y-4 sm:space-y-6 animate-in fade-in duration-200">
@@ -125,10 +184,21 @@ export default function DashboardPage() {
           <span className="text-xs sm:text-sm font-black text-slate-900">
             {t.counterOpen}
           </span>
-          <span className="text-slate-300">•</span>
-          <span className="text-xs sm:text-sm font-bold text-emerald-600">
-            {isUrdu ? "آج کی سیل:" : "Today Sale:"} {formatPKR(stats.todaySales)}
-          </span>
+          {canViewSalesAndProfit ? (
+            <>
+              <span className="text-slate-300">•</span>
+              <span className="text-xs sm:text-sm font-bold text-emerald-600">
+                {isUrdu ? "آج کی سیل:" : "Today Sale:"} {formatPKR(stats.todaySales)}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-slate-300">•</span>
+              <span className="text-xs sm:text-sm font-bold text-blue-600">
+                {isUrdu ? "کاؤنٹر سیشن فعال ہے" : "Active Counter Session"}
+              </span>
+            </>
+          )}
         </div>
 
         <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
@@ -136,10 +206,9 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 2. THE 8 MODULE BOXES: 2 Columns on Mobile, 4 Columns on Desktop */}
-      {/* Extremely intuitive: Clean big icons, bold text, easy touch targets */}
+      {/* 2. THE MODULE BOXES: Responsive Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {modules.map((m) => {
+        {visibleModules.map((m) => {
           const Icon = m.icon;
 
           return (
@@ -178,25 +247,47 @@ export default function DashboardPage() {
         })}
       </div>
 
-      {/* 3. BOTTOM FINANCIAL SUMMARY STRIP (Clean & Helpful Snapshot) */}
+      {/* 3. BOTTOM FINANCIAL / OPERATIONAL SUMMARY STRIP */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 pt-1">
-        <div className="p-3 bg-white rounded-xl border border-slate-200/90 text-center">
-          <div className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide">
-            {t.todaySales}
+        {canViewSalesAndProfit ? (
+          <div className="p-3 bg-white rounded-xl border border-slate-200/90 text-center">
+            <div className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide">
+              {t.todaySales}
+            </div>
+            <div className="text-sm sm:text-lg font-black text-emerald-600 mt-0.5">
+              {formatPKR(stats.todaySales)}
+            </div>
           </div>
-          <div className="text-sm sm:text-lg font-black text-emerald-600 mt-0.5">
-            {formatPKR(stats.todaySales)}
+        ) : (
+          <div className="p-3 bg-white rounded-xl border border-slate-200/90 text-center">
+            <div className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide">
+              {isUrdu ? "آج کے بلز" : "Today Invoices"}
+            </div>
+            <div className="text-sm sm:text-lg font-black text-emerald-600 mt-0.5">
+              {stats.todayBillsCount} {isUrdu ? "بلز" : "Bills"}
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="p-3 bg-white rounded-xl border border-slate-200/90 text-center">
-          <div className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide">
-            {t.totalInventoryVal}
+        {canViewSalesAndProfit ? (
+          <div className="p-3 bg-white rounded-xl border border-slate-200/90 text-center">
+            <div className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide">
+              {t.totalInventoryVal}
+            </div>
+            <div className="text-sm sm:text-lg font-black text-slate-800 mt-0.5">
+              {formatPKR(stats.totalInventoryValue)}
+            </div>
           </div>
-          <div className="text-sm sm:text-lg font-black text-slate-800 mt-0.5">
-            {formatPKR(stats.totalInventoryValue)}
+        ) : (
+          <div className="p-3 bg-white rounded-xl border border-slate-200/90 text-center">
+            <div className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide">
+              {isUrdu ? "کل پرزہ جات" : "Total Stock Items"}
+            </div>
+            <div className="text-sm sm:text-lg font-black text-slate-800 mt-0.5">
+              {stats.totalPartsCount} {isUrdu ? "پرزے" : "Parts"}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="p-3 bg-white rounded-xl border border-slate-200/90 text-center">
           <div className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide">
@@ -207,14 +298,25 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="p-3 bg-white rounded-xl border border-slate-200/90 text-center">
-          <div className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide">
-            {t.supplierPending}
+        {canViewSalesAndProfit && canAccessModule("suppliers") ? (
+          <div className="p-3 bg-white rounded-xl border border-slate-200/90 text-center">
+            <div className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide">
+              {t.supplierPending}
+            </div>
+            <div className="text-sm sm:text-lg font-black text-rose-600 mt-0.5">
+              {formatPKR(stats.totalPendingSupplierCredit)}
+            </div>
           </div>
-          <div className="text-sm sm:text-lg font-black text-rose-600 mt-0.5">
-            {formatPKR(stats.totalPendingSupplierCredit)}
+        ) : (
+          <div className="p-3 bg-white rounded-xl border border-slate-200/90 text-center">
+            <div className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wide">
+              {isUrdu ? "کل گاہک" : "Total Customers"}
+            </div>
+            <div className="text-sm sm:text-lg font-black text-blue-600 mt-0.5">
+              {stats.totalCustomersCount} {isUrdu ? "گاہک" : "Customers"}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

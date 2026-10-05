@@ -323,17 +323,32 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // Full refresh (used on initial mount, reconnect, or manual trigger)
   const refreshAll = useCallback(async () => {
     try {
-      // First attempt to sync any pending queue
-      await syncOfflineQueue();
+      // Safe fetch helper: if backend returns 403 for a module the user has no permission for,
+      // resolve gracefully with empty array instead of failing entire initial load
+      const safeFetch = async <T,>(fetcher: () => Promise<T>, fallback: T): Promise<T> => {
+        try {
+          return await fetcher();
+        } catch (err: any) {
+          const msg = String(err?.message || "");
+          if (
+            msg.includes("403") ||
+            msg.includes("Access denied") ||
+            msg.includes("ijazat nahi")
+          ) {
+            return fallback;
+          }
+          throw err;
+        }
+      };
 
       const [p, c, b, sc, m, ml, jc] = await Promise.all([
-        storageService.getParts(),
-        storageService.getCustomers(),
-        storageService.getBills(),
-        storageService.getSupplierCredits(),
-        storageService.getMechanics(),
-        storageService.getMechanicLedger(),
-        storageService.getJobCards(),
+        safeFetch(() => storageService.getParts(), []),
+        safeFetch(() => storageService.getCustomers(), []),
+        safeFetch(() => storageService.getBills(), []),
+        safeFetch(() => storageService.getSupplierCredits(), []),
+        safeFetch(() => storageService.getMechanics(), []),
+        safeFetch(() => storageService.getMechanicLedger(), []),
+        safeFetch(() => storageService.getJobCards(), []),
       ]);
 
       setParts(p);
