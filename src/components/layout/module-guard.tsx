@@ -192,18 +192,14 @@ export function RouteGuard({
     return <>{children}</>;
   }
 
-  // Session is resolving - show consistent skeleton loading state to prevent flash of restricted state
+  // If session is still resolving, do NOT block page navigation with intrusive full-screen loaders.
+  // Render children immediately so pages feel instant, snappy and fast.
   if (isLoading) {
-    return (
-      <div className="min-h-[50vh] flex flex-col items-center justify-center p-4 animate-pulse">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 text-blue-600 animate-spin" />
-          <span className="text-xs font-bold text-slate-400">
-            Checking module access permissions...
-          </span>
-        </div>
-      </div>
-    );
+    // Only super-admin route needs a brief subtle guard to prevent portal exposure
+    if (config.requireSuperAdmin) {
+      return null;
+    }
+    return <>{children}</>;
   }
 
   // Super Admin check

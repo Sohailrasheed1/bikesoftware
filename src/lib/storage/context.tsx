@@ -1,6 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useSession } from "next-auth/react";
+import { usePathname } from "next/navigation";
 import {
   Part,
   Customer,
@@ -161,6 +163,9 @@ const defaultStats: DashboardStats = {
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
+  const { status } = useSession();
+  const pathname = usePathname();
+
   const [parts, setParts] = useState<Part[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
@@ -168,9 +173,31 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [mechanics, setMechanics] = useState<Mechanic[]>([]);
   const [mechanicLedger, setMechanicLedger] = useState<MechanicLedgerEntry[]>([]);
   const [jobCards, setJobCards] = useState<VehicleJobCard[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
+
+  // Instant 0ms cache hydration on client mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const cp = JSON.parse(localStorage.getItem("jilani_autos_cache_parts") || localStorage.getItem("gilani_autos_cache_parts") || localStorage.getItem("skander_cache_parts") || "[]");
+      const cc = JSON.parse(localStorage.getItem("jilani_autos_cache_customers") || localStorage.getItem("gilani_autos_cache_customers") || localStorage.getItem("skander_cache_customers") || "[]");
+      const cb = JSON.parse(localStorage.getItem("jilani_autos_cache_bills") || localStorage.getItem("gilani_autos_cache_bills") || localStorage.getItem("skander_cache_bills") || "[]");
+      const csc = JSON.parse(localStorage.getItem("jilani_autos_cache_credits") || localStorage.getItem("gilani_autos_cache_credits") || localStorage.getItem("skander_cache_credits") || "[]");
+      const cm = JSON.parse(localStorage.getItem("jilani_autos_cache_mechanics") || localStorage.getItem("gilani_autos_cache_mechanics") || localStorage.getItem("skander_cache_mechanics") || "[]");
+      const cml = JSON.parse(localStorage.getItem("jilani_autos_cache_ledger") || localStorage.getItem("gilani_autos_cache_ledger") || localStorage.getItem("skander_cache_ledger") || "[]");
+      const cjc = JSON.parse(localStorage.getItem("jilani_autos_cache_jobCards") || localStorage.getItem("gilani_autos_cache_jobCards") || localStorage.getItem("skander_cache_jobCards") || "[]");
+
+      if (cp.length > 0) setParts(cp);
+      if (cc.length > 0) setCustomers(cc);
+      if (cb.length > 0) setBills(cb);
+      if (csc.length > 0) setSupplierCredits(csc);
+      if (cm.length > 0) setMechanics(cm);
+      if (cml.length > 0) setMechanicLedger(cml);
+      if (cjc.length > 0) setJobCards(cjc);
+    } catch {}
+  }, []);
 
   // Helper to read offline sync queue
   const getOfflineQueue = (): OfflineQueue => {
@@ -322,8 +349,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   // Full refresh (used on initial mount, reconnect, or manual trigger)
   const refreshAll = useCallback(async () => {
+    // If on login page, DO NOT fetch backend data
+    if (typeof window !== "undefined" && window.location.pathname === "/login") {
+      setLoading(false);
+      return;
+    }
+
     try {
-      // Safe fetch helper: if backend returns 403 for a module the user has no permission for,
+      // Safe fetch helper: if backend returns 403 or 401 for a module,
       // resolve gracefully with empty array instead of failing entire initial load
       const safeFetch = async <T,>(fetcher: () => Promise<T>, fallback: T): Promise<T> => {
         try {
@@ -333,7 +366,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           if (
             msg.includes("403") ||
             msg.includes("Access denied") ||
-            msg.includes("ijazat nahi")
+            msg.includes("ijazat nahi") ||
+            msg.includes("401") ||
+            msg.includes("Unauthorized")
           ) {
             return fallback;
           }
@@ -360,9 +395,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setJobCards(jc);
       setIsOnline(true);
       saveToLocalCache(p, c, b, sc, m, ml, jc);
-    } catch (err) {
-      console.warn("Offline or failed to fetch from backend, loading local cache:", err);
-      setIsOnline(false);
+    } catch (err: any) {
+      const msg = String(err?.message || "");
+      const isAuthErr = msg.includes("401") || msg.includes("Unauthorized");
+      if (!isAuthErr) {
+        console.warn("Offline or failed to fetch from backend, loading local cache:", err);
+        setIsOnline(false);
+      }
       // Fallback to local cache
       if (typeof window !== "undefined") {
         try {
@@ -386,7 +425,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [syncOfflineQueue, saveToLocalCache]);
+  }, [saveToLocalCache]);
 
   // Online / Offline network listeners
   useEffect(() => {
@@ -405,27 +444,31 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setPendingSyncCount(count);
 
     const handleOnline = () => {
-      console.log("Device is online! Auto-syncing...");
       setIsOnline(true);
-      refreshAll();
+      if (status === "authenticated" && pathname !== "/login") {
+        refreshAll();
+      }
     };
 
     const handleOffline = () => {
-      console.log("Device is offline! Activating offline mode.");
       setIsOnline(false);
     };
 
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
 
-    // Initial load
-    refreshAll();
+    // Initial load: Only fetch if authenticated and not on /login
+    if (status === "authenticated" && pathname !== "/login") {
+      refreshAll();
+    } else {
+      setLoading(false);
+    }
 
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
-  }, [refreshAll]);
+  }, [refreshAll, status, pathname]);
 
   // ==========================================
   // INVENTORY & FIFO CRUD (OPTIMISTIC 0ms LATENCY)

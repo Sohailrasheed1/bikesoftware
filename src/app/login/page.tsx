@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
-import { signIn, useSession } from "next-auth/react";
+import { signIn, signOut, useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Wrench,
@@ -26,7 +26,10 @@ function LoginForm() {
   const { data: session, status } = useSession();
   const { toast } = useToast();
 
-  const callbackUrl = searchParams.get("callbackUrl") || "/";
+  const rawCallback = searchParams.get("callbackUrl");
+  const cleanCallbackUrl = (!rawCallback || rawCallback === "/login" || rawCallback.startsWith("/login"))
+    ? "/"
+    : rawCallback;
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -36,13 +39,10 @@ function LoginForm() {
 
   // If already authenticated via official session, redirect immediately away from login
   useEffect(() => {
-    if (status === "authenticated" && session?.user) {
-      const isSuper = (session.user as any)?.role === "superadmin";
-      if (isSuper) {
-        window.location.href = "/super-admin";
-      } else {
-        router.replace(callbackUrl);
-      }
+    if (status === "authenticated") {
+      const isSuper = (session?.user as any)?.role === "superadmin";
+      const target = isSuper ? "/super-admin" : cleanCallbackUrl;
+      window.location.replace(target);
     } else if (status === "unauthenticated" && typeof window !== "undefined") {
       // Purge any stale unverified offline keys to prevent unauthorized bypass
       localStorage.removeItem("jilani_autos_logged_in");
@@ -50,7 +50,7 @@ function LoginForm() {
       localStorage.removeItem("jilani_autos_offline_session");
       localStorage.removeItem("gilani_autos_offline_session");
     }
-  }, [status, session, router, callbackUrl]);
+  }, [status, session, cleanCallbackUrl]);
 
   // Guarantee direct DOM type attribute update for password input
   useEffect(() => {
@@ -103,57 +103,71 @@ function LoginForm() {
 
         setError(errorMsg);
         toast.error(isUrdu ? "لاگ ان ناکام رہا" : "Login Failed", errorMsg);
-      } else {
-        // Authenticated successfully via NextAuth
-        let isSuper = false;
-        try {
-          const sessionRes = await fetch("/api/auth/session", { cache: "no-store" });
-          const sessionData = await sessionRes.json();
-          if (sessionData?.user?.role === "superadmin") {
-            isSuper = true;
-          }
-        } catch (e) {
-          console.error("Session fetch error:", e);
-        }
-
-        if (isSuper) {
-          toast.success(
-            "Super Admin Khush Amdeed! 👑",
-            "SaaS Control Center par redirect ho rahe hain..."
-          );
-          setTimeout(() => {
-            window.location.href = "/super-admin";
-          }, 350);
-        } else {
-          toast.success(
-            isUrdu ? "لاگ ان کامیاب!" : "Login Successful!",
-            isUrdu ? "سافٹ ویئر میں داخل ہو رہے ہیں..." : "Entering software dashboard..."
-          );
-          setTimeout(() => {
-            window.location.href = callbackUrl || "/";
-          }, 350);
-        }
+        setLoading(false);
+        return;
       }
+
+      toast.success(
+        isUrdu ? "لاگ ان کامیاب!" : "Login Successful!",
+        isUrdu ? "سافٹ ویئر اوپن ہو رہا ہے..." : "Opening dashboard..."
+      );
+
+      let target = cleanCallbackUrl;
+      try {
+        const sessionRes = await fetch("/api/auth/session");
+        const sessionData = await sessionRes.json();
+        if (sessionData?.user?.role === "superadmin") {
+          target = "/super-admin";
+        }
+      } catch (e) {
+        console.error("Session check error:", e);
+      }
+
+      window.location.replace(target);
     } catch (err: any) {
       const errMsg =
         err?.message ||
         (isUrdu ? "لاگ ان کرنے میں مسئلہ پیش آیا۔" : "Login karne mein masla aaya.");
       setError(errMsg);
       toast.error(isUrdu ? "سسٹم کی خرابی" : "System Error", errMsg);
-    } finally {
       setLoading(false);
     }
   };
 
-
-
   if (status === "authenticated") {
+    const isSuper = (session?.user as any)?.role === "superadmin";
+    const target = isSuper ? "/super-admin" : cleanCallbackUrl;
     return (
-      <div className="flex flex-col items-center justify-center p-8 space-y-3">
-        <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-        <p className="text-xs font-bold text-slate-600">
-          {isUrdu ? "سافٹ ویئر میں داخل ہو رہے ہیں..." : "Entering software..."}
-        </p>
+      <div className="relative w-full max-w-md bg-white rounded-3xl p-8 shadow-2xl border border-slate-200 text-center space-y-4 animate-in fade-in">
+        <div className="h-14 w-14 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-2xl flex items-center justify-center mx-auto">
+          <ShieldCheck className="h-7 w-7" />
+        </div>
+        <div className="space-y-1">
+          <h2 className="text-xl font-black text-slate-900">
+            {isUrdu ? "لاگ ان تصدیق شدہ ہے" : "Already Logged In"}
+          </h2>
+          <p className="text-xs text-slate-500">
+            {isUrdu ? "سافٹ ویئر ڈیش بورڈ اوپن ہو رہا ہے..." : "Redirecting to software dashboard..."}
+          </p>
+        </div>
+        <div className="pt-2 space-y-2.5">
+          <a
+            href={target}
+            className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-sm shadow-md transition active:scale-95 cursor-pointer"
+          >
+            <span>{isUrdu ? "ڈیش بورڈ پر جائیں" : "Continue to Dashboard"}</span>
+            <ArrowRight className="h-4 w-4" />
+          </a>
+          <div>
+            <button
+              type="button"
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              className="text-xs text-slate-500 hover:text-slate-800 underline font-semibold cursor-pointer"
+            >
+              {isUrdu ? "کسی دوسرے اکاؤنٹ سے لاگ ان کریں" : "Sign in with a different account"}
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

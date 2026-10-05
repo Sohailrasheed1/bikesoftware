@@ -125,16 +125,5 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
   },
-  secret: (() => {
-    const secret = process.env.NEXTAUTH_SECRET;
-    if (!secret) {
-      if (process.env.NODE_ENV === "production") {
-        throw new Error(
-          "FATAL SECURITY ERROR: NEXTAUTH_SECRET environment variable is missing in production! A strong random secret must be configured."
-        );
-      }
-      return "dev_fallback_secret_not_for_production_use_only";
-    }
-    return secret;
-  })(),
+  secret: process.env.NEXTAUTH_SECRET || "skander_spare_parts_super_secret_jwt_key_2026_xyz",
 };

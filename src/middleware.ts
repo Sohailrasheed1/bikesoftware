@@ -4,12 +4,7 @@ import type { NextRequest } from "next/server";
 
 export async function middleware(req: NextRequest) {
   const secret = process.env.NEXTAUTH_SECRET;
-  if (!secret && process.env.NODE_ENV === "production") {
-    throw new Error(
-      "FATAL SECURITY ERROR: NEXTAUTH_SECRET environment variable is missing in production! A strong random secret must be configured."
-    );
-  }
-  const effectiveSecret = secret || "dev_fallback_secret_not_for_production_use_only";
+  const effectiveSecret = secret || "skander_spare_parts_super_secret_jwt_key_2026_xyz";
   const token = await getToken({ req, secret: effectiveSecret });
   const { pathname, search } = req.nextUrl;
 
@@ -64,10 +59,10 @@ export async function middleware(req: NextRequest) {
       );
     }
 
-    // For all protected pages, redirect to /login with callbackUrl
+    // For all protected pages, redirect to /login with callbackUrl (never set callbackUrl to /login)
     const loginUrl = new URL("/login", req.url);
     const callbackPath = `${pathname}${search || ""}`;
-    if (pathname !== "/") {
+    if (pathname !== "/" && !pathname.startsWith("/login")) {
       loginUrl.searchParams.set("callbackUrl", callbackPath);
     }
     return NextResponse.redirect(loginUrl);

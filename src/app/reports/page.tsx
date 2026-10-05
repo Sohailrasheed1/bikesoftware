@@ -31,16 +31,7 @@ export default function ReportsPage() {
   const { canAccessModule, canViewSalesAndProfit, isLoading } = useCurrentUser();
   const [reportType, setReportType] = useState<"daily" | "monthly" | "yearly">("daily");
 
-  if (isLoading) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center p-4">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 rounded-full border-3 border-slate-200 border-t-blue-600 animate-spin" />
-          <span className="text-xs font-bold text-slate-400">Loading reports...</span>
-        </div>
-      </div>
-    );
-  }
+
 
   if (!canAccessModule("reports") || !canViewSalesAndProfit) {
     return (

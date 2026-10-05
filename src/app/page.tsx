@@ -26,52 +26,7 @@ export default function DashboardPage() {
   const { t, isUrdu } = useLanguage();
   const { canViewSalesAndProfit, canAccessModule, isLoading } = useCurrentUser();
 
-  // Clean skeleton state while resolving session - prevents any flicker of unauthorized modules
-  if (isLoading) {
-    return (
-      <div className="w-full space-y-4 sm:space-y-6 animate-pulse">
-        {/* Top compact status strip skeleton */}
-        <div className="bg-white px-4 py-3.5 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <div className="h-2.5 w-2.5 rounded-full bg-slate-200" />
-            <div className="h-4 w-28 bg-slate-200 rounded-md" />
-            <div className="h-4 w-32 bg-slate-200 rounded-md hidden sm:block" />
-          </div>
-          <div className="h-4 w-24 bg-slate-200 rounded-md" />
-        </div>
 
-        {/* Modules Grid Skeleton */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div
-              key={i}
-              className="p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl bg-white border border-slate-200 min-h-[145px] sm:min-h-[175px] flex flex-col justify-between"
-            >
-              <div className="flex items-start justify-between">
-                <div className="h-11 w-11 sm:h-13 sm:w-13 rounded-xl sm:rounded-2xl bg-slate-200" />
-                <div className="h-4 w-12 bg-slate-200 rounded-full" />
-              </div>
-              <div className="space-y-2 my-2">
-                <div className="h-4 w-28 bg-slate-200 rounded" />
-                <div className="h-3 w-36 bg-slate-200 rounded" />
-              </div>
-              <div className="h-3 w-16 bg-slate-200 rounded" />
-            </div>
-          ))}
-        </div>
-
-        {/* Bottom Strip Skeleton */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 pt-1">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="p-3 bg-white rounded-xl border border-slate-200 text-center space-y-2">
-              <div className="h-3 w-20 bg-slate-200 rounded mx-auto" />
-              <div className="h-5 w-24 bg-slate-200 rounded mx-auto" />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
 
   // The 8 Core Shop Modules - Clean, Minimalist, Zero-Clutter App Launcher Grid
   const modules = [
